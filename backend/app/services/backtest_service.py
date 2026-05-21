@@ -16,7 +16,7 @@ from app.schemas.backtest import (
     EquityPoint,
     TradeRecord,
 )
-from quant_engine.backtest import run_ma_cross_backtest, run_script_backtest
+from quant_engine.backtest import run_builtin_backtest, run_script_backtest
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -28,14 +28,14 @@ def run_backtest(request: BacktestRequest, db: Session) -> BacktestResponse:
     params = _merge_params(strategy, request)
 
     if strategy.strategy_type == "builtin":
-        result = run_ma_cross_backtest(
+        result = run_builtin_backtest(
+            strategy_name=_builtin_strategy_name(strategy),
             symbol=request.symbol,
             timeframe=request.timeframe,
             start_date=request.start_date,
             end_date=request.end_date,
             initial_cash=request.initial_cash,
-            short_window=int(params.get("short_window", 7)),
-            long_window=int(params.get("long_window", 30)),
+            params=params,
             data_dir=SAMPLE_DATA_DIR,
         )
     else:
@@ -122,6 +122,14 @@ def _merge_params(strategy: Strategy, request: BacktestRequest) -> dict:
     params = dict(strategy.default_params or {})
     params.update(request.params)
     return params
+
+
+def _builtin_strategy_name(strategy: Strategy) -> str:
+    if strategy.id == "ma-cross-default":
+        return "ma_cross"
+    if strategy.id == "rsi-reversal-default":
+        return "rsi_reversal"
+    raise HTTPException(status_code=400, detail=f"Unsupported built-in strategy: {strategy.id}")
 
 
 def _save_backtest_record(

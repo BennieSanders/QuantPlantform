@@ -128,12 +128,12 @@ API 初版规划：
 
 模块职责：
 
-- `strategies/`: 策略定义，例如均线交叉、动量策略。
+- `strategies/`: 策略定义，例如均线交叉、RSI 反转、动量策略。
 - `datafeed/`: K 线数据读取与清洗，初期可以读取 `data/sample` 下的 CSV。
 - `broker/`: 虚拟货币现货撮合、现金、持仓、手续费和交易记录。
 - `analyzer/`: 收益率、最大回撤、胜率、夏普比率等指标计算。
 
-初期建议只实现一个基础策略和一个 CSV 数据源，优先跑通 BTCUSDT 日线回测闭环。
+当前已实现均线交叉和 RSI 反转两个基础策略，并使用 CSV 数据源跑通 BTCUSDT 日线回测闭环。
 
 ## 6. Database
 
@@ -252,8 +252,8 @@ def generate_signals(klines, params):
 
 ### Milestone 3: Strategy Expansion
 
-- Add multiple built-in strategies.
-- Support strategy parameter forms.
+- Add multiple built-in strategies. Current demo includes MA crossover and RSI reversal.
+- Support strategy parameter forms. Current frontend builds parameter inputs from strategy default params.
 - Add web strategy code editor with restricted strategy template.
 - Add basic performance metrics.
 - Add ETHUSDT and 1h timeframe support.

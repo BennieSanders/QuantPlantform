@@ -18,26 +18,57 @@ DEFAULT_MA_CROSS_CODE = """def generate_signals(klines, params):
     return []
 """
 
+DEFAULT_RSI_CODE = """def generate_signals(klines, params):
+    period = params.get("period", 14)
+    oversold = params.get("oversold", 30)
+    overbought = params.get("overbought", 70)
+    # Built-in rsi_reversal currently runs through quant_engine.strategies.rsi.
+    # Custom strategy execution will be connected in a later milestone.
+    return []
+"""
+
+
+BUILTIN_STRATEGIES = [
+    {
+        "id": "ma-cross-default",
+        "name": "均线交叉策略",
+        "description": "短均线上穿长均线买入，短均线下穿长均线卖出。",
+        "code": DEFAULT_MA_CROSS_CODE,
+        "default_params": {"short_window": 7, "long_window": 30},
+    },
+    {
+        "id": "rsi-reversal-default",
+        "name": "RSI 反转策略",
+        "description": "RSI 跌至超卖阈值买入，升至超买阈值卖出。",
+        "code": DEFAULT_RSI_CODE,
+        "default_params": {"period": 14, "oversold": 30, "overbought": 70},
+    },
+]
+
 
 def seed_builtin_strategies(db: Session) -> None:
-    existing = db.get(Strategy, "ma-cross-default")
-    if existing is not None:
-        return
-
     now = _now()
-    strategy = Strategy(
-        id="ma-cross-default",
-        name="均线交叉策略",
-        description="短均线上穿长均线买入，短均线下穿长均线卖出。",
-        strategy_type="builtin",
-        code=DEFAULT_MA_CROSS_CODE,
-        default_params={"short_window": 7, "long_window": 30},
-        status="active",
-        created_at=now,
-        updated_at=now,
-    )
-    db.add(strategy)
-    db.commit()
+    changed = False
+    for item in BUILTIN_STRATEGIES:
+        strategy = db.get(Strategy, item["id"])
+        if strategy is None:
+            db.add(
+                Strategy(
+                    id=item["id"],
+                    name=item["name"],
+                    description=item["description"],
+                    strategy_type="builtin",
+                    code=item["code"],
+                    default_params=item["default_params"],
+                    status="active",
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+            changed = True
+
+    if changed:
+        db.commit()
 
 
 def list_strategies(db: Session) -> list[StrategyResponse]:

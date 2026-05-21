@@ -56,6 +56,7 @@ execution.
 - Basic order risk checks
 - Order event audit trail
 - Moving average crossover strategy
+- RSI reversal strategy
 - Equity curve, trades, total return, annualized return, max drawdown, Sharpe ratio, win rate
 
 ## Extension Path

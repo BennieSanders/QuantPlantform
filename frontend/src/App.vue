@@ -173,7 +173,7 @@
 
             <label>
               策略
-              <select v-model="form.strategyId">
+              <select v-model="form.strategyId" @change="syncSelectedStrategyFromForm">
                 <option v-for="strategy in strategies" :key="strategy.id" :value="strategy.id">
                   {{ strategy.name }}
                 </option>
@@ -202,14 +202,14 @@
               <input v-model.number="form.initialCash" min="1" step="100" type="number" />
             </label>
 
-            <label>
-              短均线周期
-              <input v-model.number="form.shortWindow" min="1" type="number" />
-            </label>
-
-            <label>
-              长均线周期
-              <input v-model.number="form.longWindow" min="2" type="number" />
+            <label v-for="field in strategyParamFields" :key="field.key">
+              {{ field.label }}
+              <input
+                v-model.number="form.params[field.key]"
+                :min="field.min"
+                :step="field.step"
+                type="number"
+              />
             </label>
 
             <button :disabled="loading" type="submit">
@@ -386,6 +386,17 @@ const activeView = ref("dashboard");
 const currentView = computed(
   () => navItems.find((item) => item.key === activeView.value) ?? navItems[0],
 );
+const selectedFormStrategy = computed(
+  () => strategies.value.find((strategy) => strategy.id === form.strategyId) ?? null,
+);
+const strategyParamFields = computed(() =>
+  Object.entries(selectedFormStrategy.value?.default_params ?? {}).map(([key, value]) => ({
+    key,
+    label: formatParamLabel(key),
+    min: getParamMin(key),
+    step: Number.isInteger(value) ? 1 : 0.1,
+  })),
+);
 
 const dashboardChartRef = ref(null);
 const backtestChartRef = ref(null);
@@ -412,8 +423,7 @@ const form = reactive({
   startDate: "2024-01-01",
   endDate: "2024-12-31",
   initialCash: 10000,
-  shortWindow: 7,
-  longWindow: 30,
+  params: {},
 });
 
 const strategyDraft = reactive({
@@ -462,15 +472,12 @@ async function submitBacktest() {
       symbol: form.symbol,
       timeframe: form.timeframe,
       position_mode: "long_only",
-      strategy: strategy?.strategy_type === "custom_code" ? "custom_code" : "ma_cross",
+      strategy: getStrategyKind(strategy),
       strategy_id: form.strategyId,
       start_date: form.startDate,
       end_date: form.endDate,
       initial_cash: form.initialCash,
-      params: {
-        short_window: form.shortWindow,
-        long_window: form.longWindow,
-      },
+      params: { ...form.params },
     };
 
     result.value = await runBacktest(payload);
@@ -507,6 +514,12 @@ function selectStrategy(strategy) {
   strategyDraft.code = strategy.code;
   strategyDraft.paramsText = JSON.stringify(strategy.default_params, null, 2);
   form.strategyId = strategy.id;
+  form.params = { ...strategy.default_params };
+}
+
+function syncSelectedStrategyFromForm() {
+  const strategy = strategies.value.find((item) => item.id === form.strategyId);
+  if (strategy) selectStrategy(strategy);
 }
 
 function newStrategy() {
@@ -711,5 +724,27 @@ function formatStatus(status) {
   if (status === "draft") return "草稿";
   if (status === "archived") return "归档";
   return status;
+}
+
+function getStrategyKind(strategy) {
+  if (strategy?.strategy_type === "custom_code") return "custom_code";
+  if (strategy?.id === "rsi-reversal-default") return "rsi_reversal";
+  return "ma_cross";
+}
+
+function formatParamLabel(key) {
+  const labels = {
+    short_window: "短均线周期",
+    long_window: "长均线周期",
+    period: "RSI 周期",
+    oversold: "超卖阈值",
+    overbought: "超买阈值",
+  };
+  return labels[key] ?? key;
+}
+
+function getParamMin(key) {
+  if (key === "overbought" || key === "oversold") return 1;
+  return 2;
 }
 </script>

@@ -9,7 +9,7 @@ class BacktestRequest(BaseModel):
     symbol: Literal["BTCUSDT", "ETHUSDT"]
     timeframe: Literal["1d", "1h"] = "1d"
     position_mode: Literal["long_only"] = "long_only"
-    strategy: Literal["ma_cross", "custom_code"] = "ma_cross"
+    strategy: Literal["ma_cross", "rsi_reversal", "custom_code"] = "ma_cross"
     strategy_id: str | None = None
     start_date: str
     end_date: str
@@ -17,10 +17,21 @@ class BacktestRequest(BaseModel):
     params: dict[str, int | float | str] = Field(default_factory=dict)
 
     @model_validator(mode="after")
-    def validate_ma_params(self) -> "BacktestRequest":
-        if self.strategy != "ma_cross" and "short_window" not in self.params:
+    def validate_strategy_params(self) -> "BacktestRequest":
+        if self.strategy == "rsi_reversal" or "period" in self.params:
+            period = self.params.get("period", 14)
+            oversold = self.params.get("oversold", 30)
+            overbought = self.params.get("overbought", 70)
+            if not all(isinstance(value, int | float) for value in [period, oversold, overbought]):
+                raise ValueError("RSI params must be numbers")
+            if period <= 1:
+                raise ValueError("RSI period must be greater than 1")
+            if not 0 < oversold < overbought < 100:
+                raise ValueError("RSI thresholds must satisfy 0 < oversold < overbought < 100")
             return self
 
+        if self.strategy != "ma_cross" and "short_window" not in self.params:
+            return self
         short_window = self.params.get("short_window", 7)
         long_window = self.params.get("long_window", 30)
         if not isinstance(short_window, int | float) or not isinstance(long_window, int | float):

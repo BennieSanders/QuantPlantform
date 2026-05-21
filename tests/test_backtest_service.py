@@ -20,6 +20,7 @@ class BacktestServiceTest(unittest.TestCase):
             )
 
             from app.core.database import SessionLocal, init_db
+            from app.models.strategy import Strategy
             from app.schemas.backtest import BacktestRequest
             from app.services.backtest_service import (
                 get_backtest_record,
@@ -31,6 +32,10 @@ class BacktestServiceTest(unittest.TestCase):
             init_db()
             with SessionLocal() as db:
                 seed_builtin_strategies(db)
+                strategies = [strategy.id for strategy in db.query(Strategy).all()]
+                self.assertIn("ma-cross-default", strategies)
+                self.assertIn("rsi-reversal-default", strategies)
+
                 response = run_backtest(
                     BacktestRequest(
                         asset_class="crypto",
@@ -60,6 +65,27 @@ class BacktestServiceTest(unittest.TestCase):
                 assert detail is not None
                 self.assertEqual(len(detail.equity_curve), 366)
                 self.assertEqual(len(detail.trades), 14)
+
+                rsi_response = run_backtest(
+                    BacktestRequest(
+                        asset_class="crypto",
+                        market_type="spot",
+                        symbol="BTCUSDT",
+                        timeframe="1d",
+                        position_mode="long_only",
+                        strategy="rsi_reversal",
+                        strategy_id="rsi-reversal-default",
+                        start_date="2024-01-01",
+                        end_date="2024-12-31",
+                        initial_cash=10000,
+                        params={"period": 14, "oversold": 30, "overbought": 70},
+                    ),
+                    db,
+                )
+
+                self.assertEqual(rsi_response.strategy, "rsi_reversal")
+                self.assertEqual(rsi_response.metrics.total_return, 0.208876)
+                self.assertEqual(len(rsi_response.trades), 9)
 
 
 if __name__ == "__main__":
