@@ -1,0 +1,29 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+.venv/
+venv/
+
+node_modules/
+dist/
+.vite/
+
+.env
+.env.*
+!.env.example
+
+*.log
+.DS_Store
+
+*.db
+*.sqlite
+*.sqlite3
+
+data/raw/
+data/local/
+
+# Local/sensitive datafeed config. Keep sample CSV files versioned.
+quant_engine/datafeed/mode: rule.yaml
