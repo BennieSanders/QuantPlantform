@@ -380,6 +380,30 @@ th {
   gap: 18px;
 }
 
+.history-layout {
+  display: grid;
+  grid-template-columns: minmax(360px, 520px) minmax(0, 1fr);
+  gap: 18px;
+}
+
+.history-detail {
+  display: grid;
+  gap: 18px;
+}
+
+.history-table {
+  max-height: calc(100vh - 190px);
+}
+
+.clickable-row {
+  cursor: pointer;
+}
+
+.clickable-row:hover,
+.clickable-row.selected {
+  background: #f0fdfa;
+}
+
 .strategy-list {
   display: flex;
   flex-direction: column;
@@ -457,6 +481,7 @@ th {
   }
 
   .workspace,
+  .history-layout,
   .strategy-layout {
     grid-template-columns: 1fr;
   }

@@ -92,6 +92,74 @@
         </section>
       </section>
 
+      <section v-if="activeView === 'history'" class="history-layout">
+        <section class="content-card">
+          <div class="section-heading">
+            <h2>回测历史</h2>
+            <button class="secondary-button" type="button" @click="refreshBacktests">刷新</button>
+          </div>
+          <div class="table-wrap history-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>时间</th>
+                  <th>标的</th>
+                  <th>策略</th>
+                  <th>收益率</th>
+                  <th>最大回撤</th>
+                  <th>夏普</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="record in recentBacktests"
+                  :key="record.id"
+                  :class="{ selected: selectedHistoryId === record.id }"
+                  class="clickable-row"
+                  @click="loadBacktestRecord(record.id)"
+                >
+                  <td>{{ formatDateTime(record.created_at) }}</td>
+                  <td>{{ record.symbol }} · {{ record.timeframe }}</td>
+                  <td>{{ record.strategy_name }}</td>
+                  <td>{{ formatPercent(record.metrics.total_return) }}</td>
+                  <td>{{ formatPercent(record.metrics.max_drawdown) }}</td>
+                  <td>{{ formatNumber(record.metrics.sharpe_ratio) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="content-card history-detail">
+          <div class="section-heading">
+            <h2>历史详情</h2>
+            <span>{{ selectedHistoryResult?.backtest_id ?? "请选择一条记录" }}</span>
+          </div>
+
+          <div class="summary-grid">
+            <article class="metric">
+              <span>总收益率</span>
+              <strong>{{ formatPercent(selectedHistoryResult?.metrics.total_return) }}</strong>
+            </article>
+            <article class="metric">
+              <span>年化收益率</span>
+              <strong>{{ formatPercent(selectedHistoryResult?.metrics.annualized_return) }}</strong>
+            </article>
+            <article class="metric">
+              <span>最大回撤</span>
+              <strong>{{ formatPercent(selectedHistoryResult?.metrics.max_drawdown) }}</strong>
+            </article>
+            <article class="metric">
+              <span>交易次数</span>
+              <strong>{{ selectedHistoryResult?.metrics.trade_count ?? "-" }}</strong>
+            </article>
+          </div>
+
+          <div ref="historyChartRef" class="chart"></div>
+          <TradeTable :trades="selectedHistoryResult?.trades ?? []" />
+        </section>
+      </section>
+
       <section v-if="activeView === 'backtest'" class="workspace">
         <aside class="control-panel">
           <form class="form-grid" @submit.prevent="submitBacktest">
@@ -260,11 +328,12 @@
 <script setup>
 import * as echarts from "echarts";
 import { computed, defineComponent, h, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
-import { createStrategy, deleteStrategy, listBacktests, listStrategies, runBacktest, updateStrategy } from "./api";
+import { createStrategy, deleteStrategy, getBacktest, listBacktests, listStrategies, runBacktest, updateStrategy } from "./api";
 
 const navItems = [
   { key: "dashboard", label: "Dashboard", title: "系统总览", eyebrow: "Overview", icon: "□" },
   { key: "backtest", label: "回测中心", title: "回测中心", eyebrow: "Backtest", icon: "◧" },
+  { key: "history", label: "回测历史", title: "回测历史", eyebrow: "History", icon: "≋" },
   { key: "strategies", label: "策略管理", title: "策略管理", eyebrow: "Strategy CRUD", icon: "⌘" },
 ];
 
@@ -320,10 +389,13 @@ const currentView = computed(
 
 const dashboardChartRef = ref(null);
 const backtestChartRef = ref(null);
+const historyChartRef = ref(null);
 const loading = ref(false);
 const errorMessage = ref("");
 const result = ref(null);
 const recentBacktests = ref([]);
+const selectedHistoryId = ref("");
+const selectedHistoryResult = ref(null);
 const strategies = ref([]);
 const selectedStrategy = ref(null);
 const strategySaving = ref(false);
@@ -331,6 +403,7 @@ const strategyMessage = ref("");
 const strategyError = ref("");
 let dashboardChart = null;
 let backtestChart = null;
+let historyChart = null;
 
 const form = reactive({
   symbol: "BTCUSDT",
@@ -361,6 +434,7 @@ onBeforeUnmount(() => {
   window.removeEventListener("resize", resizeCharts);
   dashboardChart?.dispose();
   backtestChart?.dispose();
+  historyChart?.dispose();
 });
 
 watch(activeView, async () => {
@@ -400,7 +474,9 @@ async function submitBacktest() {
     };
 
     result.value = await runBacktest(payload);
-    recentBacktests.value = await listBacktests(10);
+    selectedHistoryId.value = result.value.backtest_id;
+    selectedHistoryResult.value = result.value;
+    await refreshBacktests();
     await nextTick();
     ensureCharts();
     renderCharts();
@@ -409,6 +485,18 @@ async function submitBacktest() {
   } finally {
     loading.value = false;
   }
+}
+
+async function refreshBacktests() {
+  recentBacktests.value = await listBacktests(20);
+}
+
+async function loadBacktestRecord(id) {
+  selectedHistoryId.value = id;
+  selectedHistoryResult.value = await getBacktest(id);
+  await nextTick();
+  ensureCharts();
+  renderCharts();
 }
 
 function selectStrategy(strategy) {
@@ -502,18 +590,22 @@ function ensureCharts() {
   if (backtestChartRef.value && !backtestChart) {
     backtestChart = echarts.init(backtestChartRef.value);
   }
+  if (historyChartRef.value && !historyChart) {
+    historyChart = echarts.init(historyChartRef.value);
+  }
 }
 
 function renderCharts() {
-  renderChart(dashboardChart);
-  renderChart(backtestChart);
+  renderChart(dashboardChart, result.value);
+  renderChart(backtestChart, result.value);
+  renderChart(historyChart, selectedHistoryResult.value);
 }
 
-function renderChart(chart) {
-  if (!chart || !result.value) return;
+function renderChart(chart, source) {
+  if (!chart || !source) return;
 
-  const dates = result.value.equity_curve.map((point) => point.date);
-  const values = result.value.equity_curve.map((point) => point.equity);
+  const dates = source.equity_curve.map((point) => point.date);
+  const values = source.equity_curve.map((point) => point.equity);
 
   chart.setOption({
     color: ["#0f766e"],
@@ -571,6 +663,7 @@ function renderChart(chart) {
 function resizeCharts() {
   dashboardChart?.resize();
   backtestChart?.resize();
+  historyChart?.resize();
 }
 
 function formatPercent(value) {

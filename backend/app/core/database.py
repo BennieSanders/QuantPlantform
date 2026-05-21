@@ -1,4 +1,5 @@
 from collections.abc import Generator
+import os
 from pathlib import Path
 
 from sqlalchemy import create_engine
@@ -6,7 +7,7 @@ from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 
 DATABASE_PATH = Path(__file__).resolve().parents[2] / "quant_platform.db"
-DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
+DATABASE_URL = os.getenv("QUANT_PLATFORM_DATABASE_URL", f"sqlite:///{DATABASE_PATH}")
 
 engine = create_engine(
     DATABASE_URL,

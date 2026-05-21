@@ -69,6 +69,7 @@ quant-platform/
 - Strategy Page: 策略列表、策略参数配置、策略代码编辑
 - Backtest Page: 交易标的、K 线周期、时间区间、初始资金、策略选择
 - Backtest Result Page: 收益曲线、交易记录、指标展示
+- Backtest History Page: 回测记录列表、历史权益曲线和交易明细
 
 前端不直接处理策略回测逻辑，只提交参数、策略代码和回测请求，并展示后端返回结果。策略代码编辑器可以使用 Monaco Editor 或 CodeMirror。
 
@@ -246,7 +247,7 @@ def generate_signals(klines, params):
 ### Milestone 2: Persistence
 
 - SQLite stores strategies and backtest records for the course demo.
-- Backtest history is queryable through API and visible on Dashboard.
+- Backtest history is queryable through API and visible on Dashboard/History views.
 - Later replace SQLite with MySQL and add users/authentication.
 
 ### Milestone 3: Strategy Expansion

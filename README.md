@@ -62,7 +62,8 @@ Frontend crypto backtest form
 - `POST /api/backtests` 已接入真实回测结果，并保存回测记录。
 - `GET /api/backtests` 和 `GET /api/backtests/{id}` 已支持查询最近回测和详情。
 - `/api/strategies` 已支持策略 CRUD，并通过 SQLite 持久化到 `backend/quant_platform.db`。
-- 前端已具备侧栏式平台布局，包含 Dashboard、回测中心、策略管理三个视图；Dashboard 可展示最近回测记录。
+- 前端已具备侧栏式平台布局，包含 Dashboard、回测中心、回测历史、策略管理四个视图；Dashboard 可展示最近回测记录。
+- `tests/` 已覆盖量化内核稳定结果和回测记录持久化服务。
 
 检查 CSV 读取：
 
@@ -80,6 +81,12 @@ python3 scripts/check_ma_cross.py
 
 ```bash
 python3 scripts/check_backtest.py
+```
+
+运行自动化测试：
+
+```bash
+PYTHONPATH="$(pwd):$(pwd)/backend" backend/.venv/bin/python -m unittest discover -s tests -v
 ```
 
 启动后端：
