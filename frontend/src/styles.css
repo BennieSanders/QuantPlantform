@@ -428,8 +428,24 @@ th {
 }
 
 .strategy-item span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.strategy-item small {
   color: #64748b;
   font-size: 12px;
+}
+
+.link-button {
+  border: 0;
+  padding: 0;
+  color: #0f766e;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 900;
 }
 
 .strategy-editor {

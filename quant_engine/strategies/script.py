@@ -44,6 +44,9 @@ class ScriptSignalStrategy(Strategy):
 
 
 def compile_signal_function(code: str) -> SignalFunction:
+    if not code.strip():
+        raise ValueError("strategy code cannot be empty")
+
     namespace: dict[str, Any] = {
         "__builtins__": {
             "abs": abs,

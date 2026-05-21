@@ -22,12 +22,13 @@ class BacktestServiceTest(unittest.TestCase):
             from app.core.database import SessionLocal, init_db
             from app.models.strategy import Strategy
             from app.schemas.backtest import BacktestRequest
+            from app.schemas.strategy import StrategyCreate
             from app.services.backtest_service import (
                 get_backtest_record,
                 list_backtest_records,
                 run_backtest,
             )
-            from app.services.strategy_service import seed_builtin_strategies
+            from app.services.strategy_service import create_strategy, seed_builtin_strategies
 
             init_db()
             with SessionLocal() as db:
@@ -86,6 +87,53 @@ class BacktestServiceTest(unittest.TestCase):
                 self.assertEqual(rsi_response.strategy, "rsi_reversal")
                 self.assertEqual(rsi_response.metrics.total_return, 0.208876)
                 self.assertEqual(len(rsi_response.trades), 9)
+
+                with self.assertRaisesRegex(ValueError, "Invalid custom strategy code"):
+                    create_strategy(
+                        db,
+                        StrategyCreate(
+                            name="无效策略",
+                            strategy_type="custom_code",
+                            code="def nope():\n    return []",
+                            default_params={},
+                            status="draft",
+                        ),
+                    )
+
+                custom_strategy = create_strategy(
+                    db,
+                    StrategyCreate(
+                        name="自定义买入持有",
+                        strategy_type="custom_code",
+                        code=(
+                            "def generate_signals(klines, params):\n"
+                            "    if len(klines) == 2:\n"
+                            "        return [{\"date\": klines[-1].date, \"action\": \"buy\"}]\n"
+                            "    return []\n"
+                        ),
+                        default_params={},
+                        status="active",
+                    ),
+                )
+                custom_response = run_backtest(
+                    BacktestRequest(
+                        asset_class="crypto",
+                        market_type="spot",
+                        symbol="BTCUSDT",
+                        timeframe="1d",
+                        position_mode="long_only",
+                        strategy="custom_code",
+                        strategy_id=custom_strategy.id,
+                        start_date="2024-01-01",
+                        end_date="2024-01-31",
+                        initial_cash=10000,
+                        params={},
+                    ),
+                    db,
+                )
+
+                self.assertEqual(custom_response.strategy, custom_strategy.id)
+                self.assertEqual(len(custom_response.trades), 1)
 
 
 if __name__ == "__main__":

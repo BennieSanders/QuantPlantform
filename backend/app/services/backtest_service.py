@@ -27,29 +27,34 @@ def run_backtest(request: BacktestRequest, db: Session) -> BacktestResponse:
     strategy = _load_strategy(request, db)
     params = _merge_params(strategy, request)
 
-    if strategy.strategy_type == "builtin":
-        result = run_builtin_backtest(
-            strategy_name=_builtin_strategy_name(strategy),
-            symbol=request.symbol,
-            timeframe=request.timeframe,
-            start_date=request.start_date,
-            end_date=request.end_date,
-            initial_cash=request.initial_cash,
-            params=params,
-            data_dir=SAMPLE_DATA_DIR,
-        )
-    else:
-        result = run_script_backtest(
-            symbol=request.symbol,
-            timeframe=request.timeframe,
-            start_date=request.start_date,
-            end_date=request.end_date,
-            initial_cash=request.initial_cash,
-            code=strategy.code,
-            params=params,
-            data_dir=SAMPLE_DATA_DIR,
-            strategy_name=strategy.id,
-        )
+    try:
+        if strategy.strategy_type == "builtin":
+            result = run_builtin_backtest(
+                strategy_name=_builtin_strategy_name(strategy),
+                symbol=request.symbol,
+                timeframe=request.timeframe,
+                start_date=request.start_date,
+                end_date=request.end_date,
+                initial_cash=request.initial_cash,
+                params=params,
+                data_dir=SAMPLE_DATA_DIR,
+            )
+        else:
+            result = run_script_backtest(
+                symbol=request.symbol,
+                timeframe=request.timeframe,
+                start_date=request.start_date,
+                end_date=request.end_date,
+                initial_cash=request.initial_cash,
+                code=strategy.code,
+                params=params,
+                data_dir=SAMPLE_DATA_DIR,
+                strategy_name=strategy.id,
+            )
+    except HTTPException:
+        raise
+    except Exception as error:
+        raise HTTPException(status_code=400, detail=f"Backtest failed: {error}") from error
 
     response = BacktestResponse(
         backtest_id=f"bt-{uuid4().hex[:8]}",

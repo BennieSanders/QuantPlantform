@@ -61,9 +61,10 @@ Frontend crypto backtest form
 - `quant_engine` 已支持现货只做多回测，包含交易记录、权益曲线、总收益率、年化收益率、最大回撤、夏普比率、胜率等指标。
 - `POST /api/backtests` 已接入真实回测结果，并保存回测记录。
 - `GET /api/backtests` 和 `GET /api/backtests/{id}` 已支持查询最近回测和详情。
-- `/api/strategies` 已支持策略 CRUD，并通过 SQLite 持久化到 `backend/quant_platform.db`。
+- `/api/strategies` 已支持策略 CRUD，并通过 SQLite 持久化到 `backend/quant_platform.db`；自定义策略保存前会校验 `generate_signals(klines, params)`。
 - 前端已具备侧栏式平台布局，包含 Dashboard、回测中心、回测历史、策略管理四个视图；Dashboard 可展示最近回测记录，回测中心可根据策略默认参数动态生成参数表单。
-- `tests/` 已覆盖 MA/RSI 内置策略稳定结果和回测记录持久化服务。
+- 策略管理已支持从内置策略复制为自定义策略模板，再编辑和保存。
+- `tests/` 已覆盖 MA/RSI 内置策略稳定结果、自定义策略校验和回测记录持久化服务。
 
 检查 CSV 读取：
 

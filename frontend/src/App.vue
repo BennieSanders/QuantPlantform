@@ -261,8 +261,11 @@
             type="button"
             @click="selectStrategy(strategy)"
           >
-            <strong>{{ strategy.name }}</strong>
-            <span>{{ formatStrategyType(strategy.strategy_type) }} · {{ formatStatus(strategy.status) }}</span>
+            <span>
+              <strong>{{ strategy.name }}</strong>
+              <button class="link-button" type="button" @click.stop="copyStrategy(strategy)">复制</button>
+            </span>
+            <small>{{ formatStrategyType(strategy.strategy_type) }} · {{ formatStatus(strategy.status) }}</small>
           </button>
         </section>
 
@@ -307,6 +310,14 @@
                 {{ strategySaving ? "保存中..." : "保存策略" }}
               </button>
               <button
+                v-if="selectedStrategy?.strategy_type === 'builtin'"
+                class="secondary-button"
+                type="button"
+                @click="copyStrategy(selectedStrategy)"
+              >
+                复制为自定义策略
+              </button>
+              <button
                 v-if="selectedStrategy && selectedStrategy.strategy_type !== 'builtin'"
                 class="danger-button"
                 type="button"
@@ -336,6 +347,25 @@ const navItems = [
   { key: "history", label: "回测历史", title: "回测历史", eyebrow: "History", icon: "≋" },
   { key: "strategies", label: "策略管理", title: "策略管理", eyebrow: "Strategy CRUD", icon: "⌘" },
 ];
+
+const DEFAULT_CUSTOM_STRATEGY_CODE = `def generate_signals(klines, params):
+    short_window = int(params.get("short_window", 7))
+    long_window = int(params.get("long_window", 30))
+    if len(klines) < long_window + 1:
+        return []
+
+    closes = [kline.close for kline in klines]
+    prev_short = sum(closes[-short_window - 1:-1]) / short_window
+    prev_long = sum(closes[-long_window - 1:-1]) / long_window
+    curr_short = sum(closes[-short_window:]) / short_window
+    curr_long = sum(closes[-long_window:]) / long_window
+
+    if prev_short <= prev_long and curr_short > curr_long:
+        return [{"date": klines[-1].date, "action": "buy"}]
+    if prev_short >= prev_long and curr_short < curr_long:
+        return [{"date": klines[-1].date, "action": "sell"}]
+    return []
+`;
 
 const TradeTable = defineComponent({
   props: {
@@ -527,26 +557,20 @@ function newStrategy() {
   strategyDraft.name = "新策略";
   strategyDraft.description = "";
   strategyDraft.status = "draft";
-  strategyDraft.code = `def generate_signals(klines, params):
-    short_window = int(params.get("short_window", 7))
-    long_window = int(params.get("long_window", 30))
-    if len(klines) < long_window + 1:
-        return []
-
-    closes = [kline.close for kline in klines]
-    prev_short = sum(closes[-short_window - 1:-1]) / short_window
-    prev_long = sum(closes[-long_window - 1:-1]) / long_window
-    curr_short = sum(closes[-short_window:]) / short_window
-    curr_long = sum(closes[-long_window:]) / long_window
-
-    if prev_short <= prev_long and curr_short > curr_long:
-        return [{"date": klines[-1].date, "action": "buy"}]
-    if prev_short >= prev_long and curr_short < curr_long:
-        return [{"date": klines[-1].date, "action": "sell"}]
-    return []
-`;
+  strategyDraft.code = DEFAULT_CUSTOM_STRATEGY_CODE;
   strategyDraft.paramsText = JSON.stringify({ short_window: 7, long_window: 30 }, null, 2);
   strategyMessage.value = "";
+  strategyError.value = "";
+}
+
+function copyStrategy(strategy) {
+  selectedStrategy.value = null;
+  strategyDraft.name = `${strategy.name} 副本`;
+  strategyDraft.description = strategy.description;
+  strategyDraft.status = "draft";
+  strategyDraft.code = strategy.strategy_type === "builtin" ? DEFAULT_CUSTOM_STRATEGY_CODE : strategy.code;
+  strategyDraft.paramsText = JSON.stringify(strategy.default_params, null, 2);
+  strategyMessage.value = "已复制为未保存的自定义策略";
   strategyError.value = "";
 }
 
@@ -559,7 +583,7 @@ async function saveStrategy() {
     const payload = {
       name: strategyDraft.name,
       description: strategyDraft.description,
-      strategy_type: selectedStrategy.value?.strategy_type ?? "custom_code",
+      strategy_type: "custom_code",
       code: strategyDraft.code,
       default_params: JSON.parse(strategyDraft.paramsText || "{}"),
       status: strategyDraft.status,

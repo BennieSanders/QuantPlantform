@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.models.strategy import Strategy
 from app.schemas.strategy import StrategyCreate, StrategyResponse, StrategyUpdate
+from quant_engine.strategies.script import compile_signal_function
 
 
 DEFAULT_MA_CROSS_CODE = """def generate_signals(klines, params):
@@ -84,6 +85,7 @@ def get_strategy(db: Session, strategy_id: str) -> StrategyResponse | None:
 
 
 def create_strategy(db: Session, payload: StrategyCreate) -> StrategyResponse:
+    _validate_custom_strategy(payload.strategy_type, payload.code)
     now = _now()
     strategy = Strategy(
         id=f"st-{uuid4().hex[:8]}",
@@ -109,6 +111,9 @@ def update_strategy(
     update_data = payload.model_dump(exclude_unset=True)
     if strategy.strategy_type == "builtin":
         update_data.pop("strategy_type", None)
+    next_strategy_type = update_data.get("strategy_type", strategy.strategy_type)
+    next_code = update_data.get("code", strategy.code)
+    _validate_custom_strategy(next_strategy_type, next_code)
 
     for key, value in update_data.items():
         setattr(strategy, key, value)
@@ -147,3 +152,12 @@ def _to_response(strategy: Strategy) -> StrategyResponse:
 
 def _now() -> datetime:
     return datetime.now(UTC)
+
+
+def _validate_custom_strategy(strategy_type: str, code: str) -> None:
+    if strategy_type != "custom_code":
+        return
+    try:
+        compile_signal_function(code)
+    except Exception as error:
+        raise ValueError(f"Invalid custom strategy code: {error}") from error

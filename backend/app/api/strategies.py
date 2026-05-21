@@ -26,7 +26,10 @@ def create_strategy_item(
     payload: StrategyCreate,
     db: Session = Depends(get_db),
 ) -> StrategyResponse:
-    return create_strategy(db, payload)
+    try:
+        return create_strategy(db, payload)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
 
 
 @router.get("/{strategy_id}", response_model=StrategyResponse)
@@ -46,7 +49,10 @@ def update_strategy_item(
     payload: StrategyUpdate,
     db: Session = Depends(get_db),
 ) -> StrategyResponse:
-    strategy = update_strategy(db, strategy_id, payload)
+    try:
+        strategy = update_strategy(db, strategy_id, payload)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
     if strategy is None:
         raise HTTPException(status_code=404, detail="Strategy not found")
     return strategy
