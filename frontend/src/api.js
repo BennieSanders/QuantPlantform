@@ -17,6 +17,16 @@ export async function runBacktest(payload) {
   return response.json();
 }
 
+export async function listBacktests(limit = 20) {
+  const response = await fetch(`${API_BASE_URL}/api/backtests?limit=${limit}`);
+  return parseResponse(response);
+}
+
+export async function getBacktest(id) {
+  const response = await fetch(`${API_BASE_URL}/api/backtests/${id}`);
+  return parseResponse(response);
+}
+
 export async function listStrategies() {
   const response = await fetch(`${API_BASE_URL}/api/strategies`);
   return parseResponse(response);

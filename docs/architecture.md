@@ -97,6 +97,7 @@ API 初版规划：
 - `POST /api/strategies`
 - `PUT /api/strategies/{id}`
 - `POST /api/backtests`
+- `GET /api/backtests`
 - `GET /api/backtests/{id}`
 - `GET /api/users/me`
 
@@ -172,6 +173,7 @@ API 初版规划：
 - `params`
 - `metrics`
 - `equity_curve`
+- `trades`
 - `created_at`
 
 ### kline_data
@@ -243,8 +245,9 @@ def generate_signals(klines, params):
 
 ### Milestone 2: Persistence
 
-- MySQL stores users, strategies, and backtest records.
-- Backtest history page works.
+- SQLite stores strategies and backtest records for the course demo.
+- Backtest history is queryable through API and visible on Dashboard.
+- Later replace SQLite with MySQL and add users/authentication.
 
 ### Milestone 3: Strategy Expansion
 

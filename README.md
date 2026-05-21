@@ -54,14 +54,15 @@ Frontend crypto backtest form
 
 ## 当前进度
 
-- FastAPI 后端已具备 `/health` 和模拟 `/api/backtests` 接口。
+- FastAPI 后端已具备 `/health`、`/api/backtests` 和 `/api/strategies` 接口。
 - 已准备 Binance 公开数据源的 BTCUSDT、ETHUSDT 2024 年日线 CSV。
 - `quant_engine.datafeed` 已支持读取本地 K 线 CSV。
 - `quant_engine.strategies` 已支持均线交叉信号生成。
-- `quant_engine` 已支持现货只做多回测，包含交易记录、权益曲线和基础指标。
-- `/api/backtests` 已接入真实回测结果。
+- `quant_engine` 已支持现货只做多回测，包含交易记录、权益曲线、总收益率、年化收益率、最大回撤、夏普比率、胜率等指标。
+- `POST /api/backtests` 已接入真实回测结果，并保存回测记录。
+- `GET /api/backtests` 和 `GET /api/backtests/{id}` 已支持查询最近回测和详情。
 - `/api/strategies` 已支持策略 CRUD，并通过 SQLite 持久化到 `backend/quant_platform.db`。
-- 前端已具备侧栏式平台布局，包含 Dashboard、回测中心、策略管理三个视图。
+- 前端已具备侧栏式平台布局，包含 Dashboard、回测中心、策略管理三个视图；Dashboard 可展示最近回测记录。
 
 检查 CSV 读取：
 

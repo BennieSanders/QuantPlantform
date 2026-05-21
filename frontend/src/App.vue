@@ -39,16 +39,16 @@
             <strong>{{ formatPercent(result?.metrics.total_return) }}</strong>
           </article>
           <article class="metric">
-            <span>最大回撤</span>
-            <strong>{{ formatPercent(result?.metrics.max_drawdown) }}</strong>
+            <span>年化收益率</span>
+            <strong>{{ formatPercent(result?.metrics.annualized_return) }}</strong>
           </article>
           <article class="metric">
             <span>最终权益</span>
             <strong>{{ formatMoney(result?.metrics.final_equity) }}</strong>
           </article>
           <article class="metric">
-            <span>策略数量</span>
-            <strong>{{ strategies.length }}</strong>
+            <span>夏普比率</span>
+            <strong>{{ formatNumber(result?.metrics.sharpe_ratio) }}</strong>
           </article>
         </div>
 
@@ -58,6 +58,37 @@
             <span>{{ result?.symbol ?? "BTCUSDT" }} · {{ result?.timeframe ?? "1d" }}</span>
           </div>
           <div ref="dashboardChartRef" class="chart"></div>
+        </section>
+
+        <section class="content-card">
+          <div class="section-heading">
+            <h2>最近回测记录</h2>
+            <span>{{ recentBacktests.length }} 条</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>时间</th>
+                  <th>标的</th>
+                  <th>策略</th>
+                  <th>收益率</th>
+                  <th>最大回撤</th>
+                  <th>最终权益</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="record in recentBacktests" :key="record.id">
+                  <td>{{ formatDateTime(record.created_at) }}</td>
+                  <td>{{ record.symbol }} · {{ record.timeframe }}</td>
+                  <td>{{ record.strategy_name }}</td>
+                  <td>{{ formatPercent(record.metrics.total_return) }}</td>
+                  <td>{{ formatPercent(record.metrics.max_drawdown) }}</td>
+                  <td>{{ formatMoney(record.metrics.final_equity) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </section>
       </section>
 
@@ -128,16 +159,16 @@
               <strong>{{ formatPercent(result?.metrics.total_return) }}</strong>
             </article>
             <article class="metric">
-              <span>最大回撤</span>
-              <strong>{{ formatPercent(result?.metrics.max_drawdown) }}</strong>
+              <span>年化收益率</span>
+              <strong>{{ formatPercent(result?.metrics.annualized_return) }}</strong>
             </article>
             <article class="metric">
               <span>最终权益</span>
               <strong>{{ formatMoney(result?.metrics.final_equity) }}</strong>
             </article>
             <article class="metric">
-              <span>交易次数</span>
-              <strong>{{ result?.metrics.trade_count ?? "-" }}</strong>
+              <span>夏普比率</span>
+              <strong>{{ formatNumber(result?.metrics.sharpe_ratio) }}</strong>
             </article>
           </div>
 
@@ -229,7 +260,7 @@
 <script setup>
 import * as echarts from "echarts";
 import { computed, defineComponent, h, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
-import { createStrategy, deleteStrategy, listStrategies, runBacktest, updateStrategy } from "./api";
+import { createStrategy, deleteStrategy, listBacktests, listStrategies, runBacktest, updateStrategy } from "./api";
 
 const navItems = [
   { key: "dashboard", label: "Dashboard", title: "系统总览", eyebrow: "Overview", icon: "□" },
@@ -292,6 +323,7 @@ const backtestChartRef = ref(null);
 const loading = ref(false);
 const errorMessage = ref("");
 const result = ref(null);
+const recentBacktests = ref([]);
 const strategies = ref([]);
 const selectedStrategy = ref(null);
 const strategySaving = ref(false);
@@ -368,6 +400,7 @@ async function submitBacktest() {
     };
 
     result.value = await runBacktest(payload);
+    recentBacktests.value = await listBacktests(10);
     await nextTick();
     ensureCharts();
     renderCharts();
@@ -551,6 +584,21 @@ function formatMoney(value) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })} USDT`;
+}
+
+function formatNumber(value) {
+  if (value === undefined || value === null) return "-";
+  return Number(value).toFixed(2);
+}
+
+function formatDateTime(value) {
+  if (!value) return "-";
+  return new Date(value).toLocaleString(undefined, {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function formatSide(side) {

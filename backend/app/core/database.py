@@ -28,6 +28,7 @@ def get_db() -> Generator[Session, None, None]:
 
 
 def init_db() -> None:
+    import app.models.backtest_record  # noqa: F401
     import app.models.strategy  # noqa: F401
 
     Base.metadata.create_all(bind=engine)

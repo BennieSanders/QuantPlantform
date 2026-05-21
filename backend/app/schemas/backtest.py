@@ -39,7 +39,9 @@ class EquityPoint(BaseModel):
 
 class BacktestMetrics(BaseModel):
     total_return: float
+    annualized_return: float
     max_drawdown: float
+    sharpe_ratio: float
     trade_count: int
     win_rate: float
     final_equity: float
@@ -64,3 +66,16 @@ class BacktestResponse(BaseModel):
     metrics: BacktestMetrics
     equity_curve: list[EquityPoint]
     trades: list[TradeRecord]
+
+
+class BacktestRecordSummary(BaseModel):
+    id: str
+    symbol: str
+    timeframe: str
+    strategy_id: str
+    strategy_name: str
+    start_date: str
+    end_date: str
+    initial_cash: float
+    metrics: BacktestMetrics
+    created_at: str
