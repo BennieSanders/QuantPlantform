@@ -197,9 +197,11 @@
               <input v-model="form.endDate" type="date" />
             </label>
 
+            <p class="field-hint">示例 CSV 当前只覆盖 2024-01-01 到 2024-12-31。</p>
+
             <label>
               初始资金
-              <input v-model.number="form.initialCash" min="1" step="100" type="number" />
+              <input v-model.number="form.initialCash" min="100" step="100" type="number" />
             </label>
 
             <label v-for="field in strategyParamFields" :key="field.key">
@@ -217,6 +219,7 @@
             </button>
           </form>
 
+          <p v-if="backtestMessage" class="success-message">{{ backtestMessage }}</p>
           <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
         </aside>
 
@@ -433,6 +436,7 @@ const backtestChartRef = ref(null);
 const historyChartRef = ref(null);
 const loading = ref(false);
 const errorMessage = ref("");
+const backtestMessage = ref("");
 const result = ref(null);
 const recentBacktests = ref([]);
 const selectedHistoryId = ref("");
@@ -492,6 +496,7 @@ async function refreshStrategies() {
 
 async function submitBacktest() {
   errorMessage.value = "";
+  backtestMessage.value = "";
   loading.value = true;
 
   try {
@@ -511,6 +516,7 @@ async function submitBacktest() {
     };
 
     result.value = await runBacktest(payload);
+    backtestMessage.value = `回测完成：${result.value.backtest_id} · ${strategy?.name ?? result.value.strategy} · ${result.value.metrics.trade_count} 笔交易 · 最终权益 ${formatMoney(result.value.metrics.final_equity)}`;
     selectedHistoryId.value = result.value.backtest_id;
     selectedHistoryResult.value = result.value;
     await refreshBacktests();

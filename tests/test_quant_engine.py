@@ -54,6 +54,22 @@ class QuantEngineTest(unittest.TestCase):
         self.assertEqual(result.metrics.win_rate, 0.75)
         self.assertEqual(result.metrics.final_equity, 12088.757443)
 
+    def test_ma_cross_backtest_reports_available_range_when_empty(self) -> None:
+        with self.assertRaisesRegex(
+            ValueError,
+            "Available data: 2024-01-01 to 2024-12-31",
+        ):
+            run_ma_cross_backtest(
+                symbol="BTCUSDT",
+                timeframe="1d",
+                start_date="2025-01-01",
+                end_date="2026-12-31",
+                initial_cash=10000,
+                short_window=7,
+                long_window=30,
+                data_dir=PROJECT_ROOT / "data" / "sample",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

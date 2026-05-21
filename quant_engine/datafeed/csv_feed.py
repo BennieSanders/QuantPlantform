@@ -31,12 +31,18 @@ def load_klines(
         raise ValueError("start_date must be earlier than or equal to end_date")
 
     klines: list[Kline] = []
+    first_date: date | None = None
+    last_date: date | None = None
     with path.open(newline="", encoding="utf-8") as file:
         reader = csv.DictReader(file)
         _validate_header(reader.fieldnames)
 
         for row in reader:
             kline = _parse_row(row)
+            if first_date is None or kline.date < first_date:
+                first_date = kline.date
+            if last_date is None or kline.date > last_date:
+                last_date = kline.date
             if start and kline.date < start:
                 continue
             if end and kline.date > end:
@@ -44,7 +50,12 @@ def load_klines(
             klines.append(kline)
 
     if not klines:
-        raise ValueError(f"No K-line rows loaded from {path}")
+        requested_range = _format_requested_range(start, end)
+        available_range = _format_available_range(first_date, last_date)
+        raise ValueError(
+            f"No K-line rows loaded from {path} for {requested_range}. "
+            f"Available data: {available_range}"
+        )
 
     return klines
 
@@ -74,3 +85,19 @@ def _parse_optional_date(value: str | None) -> date | None:
     if value is None:
         return None
     return date.fromisoformat(value)
+
+
+def _format_requested_range(start: date | None, end: date | None) -> str:
+    if start and end:
+        return f"requested range {start.isoformat()} to {end.isoformat()}"
+    if start:
+        return f"requested range starting {start.isoformat()}"
+    if end:
+        return f"requested range ending {end.isoformat()}"
+    return "the requested range"
+
+
+def _format_available_range(start: date | None, end: date | None) -> str:
+    if start and end:
+        return f"{start.isoformat()} to {end.isoformat()}"
+    return "unknown"
