@@ -1,3 +1,5 @@
+from typing import Literal
+
 from fastapi import APIRouter, HTTPException
 from fastapi.params import Depends, Query
 from sqlalchemy.orm import Session
@@ -21,11 +23,18 @@ router = APIRouter(prefix="/api/market", tags=["market"])
 def list_market_klines(
     symbol: MarketSymbol = Query(default="BTCUSDT"),
     timeframe: MarketTimeframe = Query(default="1m"),
-    limit: int = Query(default=200, ge=1, le=1000),
+    limit: int = Query(default=200, ge=1, le=2000),
+    range: Literal["latest", "today_shanghai"] = Query(default="latest"),
     db: Session = Depends(get_db),
     _user_id: str = Depends(get_current_user_id),
 ) -> MarketSeriesResponse:
-    return get_market_series(db, symbol=symbol, timeframe=timeframe, limit=limit)
+    return get_market_series(
+        db,
+        symbol=symbol,
+        timeframe=timeframe,
+        limit=limit,
+        range_name=range,
+    )
 
 
 @router.post("/sync", response_model=MarketSyncResponse)

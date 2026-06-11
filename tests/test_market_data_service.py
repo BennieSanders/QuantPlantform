@@ -1,6 +1,7 @@
 import os
 import sys
 import unittest
+from datetime import UTC, datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -18,6 +19,12 @@ def clear_app_modules() -> None:
 
 
 class MarketDataServiceTest(unittest.TestCase):
+    def test_shanghai_day_start_is_converted_to_utc(self) -> None:
+        from app.services.market_data_service import _shanghai_day_start_utc
+
+        start = _shanghai_day_start_utc(datetime(2026, 6, 11, 10, 30, tzinfo=UTC))
+        self.assertEqual(start, datetime(2026, 6, 10, 16, 0, tzinfo=UTC))
+
     def test_sync_upserts_and_returns_ordered_series(self) -> None:
         with TemporaryDirectory() as tmp_dir:
             clear_app_modules()

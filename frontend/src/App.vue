@@ -239,7 +239,7 @@ const DEFAULT_CUSTOM_STRATEGY_CODE = `def generate_signals(klines, params):
     return []
 `;
 
-const activeView = ref("dashboard");
+const activeView = ref("market");
 const currentView = computed(
   () => navItems.find((item) => item.key === activeView.value) ?? navItems[0],
 );
@@ -345,7 +345,12 @@ onBeforeUnmount(() => {
 });
 
 watch(activeView, async () => {
-  if (activeView.value === "market") await refreshMarketSeries();
+  if (activeView.value === "market") {
+    if (!marketAutoRefresh.value) toggleMarketAutoRefresh(true);
+  } else if (marketAutoRefresh.value) {
+    marketAutoRefresh.value = false;
+    stopMarketPolling();
+  }
   if (activeView.value === "ai" && aiBacktestId.value) await refreshAiAnalyses();
   await nextTick();
   ensureCharts();
@@ -358,7 +363,13 @@ async function initializeApp() {
     await refreshStrategies();
     await refreshJobs();
     await refreshBacktests();
-    await submitBacktest();
+    if (recentBacktests.value.length > 0) {
+      result.value = await getBacktest(recentBacktests.value[0].id);
+      selectedHistoryId.value = result.value.backtest_id;
+      selectedHistoryResult.value = result.value;
+    }
+    activeView.value = "market";
+    toggleMarketAutoRefresh(true);
   } catch (error) {
     authError.value = error.message;
     activeView.value = "account";
@@ -403,8 +414,9 @@ async function submitAuth() {
     authMessage.value = "登录成功";
     await refreshStrategies();
     await refreshJobs();
-    await submitBacktest();
-    activeView.value = "dashboard";
+    await refreshBacktests();
+    activeView.value = "market";
+    toggleMarketAutoRefresh(true);
   } catch (error) {
     authError.value = error.message;
   } finally {
@@ -548,7 +560,12 @@ async function refreshBacktests() {
 async function refreshMarketSeries() {
   marketError.value = "";
   try {
-    marketSeries.value = await getMarketKlines(marketSymbol.value, marketTimeframe.value, 200);
+    marketSeries.value = await getMarketKlines(
+      marketSymbol.value,
+      marketTimeframe.value,
+      2000,
+      "today_shanghai",
+    );
     await nextTick();
     ensureCharts();
     renderCharts();
@@ -558,6 +575,7 @@ async function refreshMarketSeries() {
 }
 
 async function syncMarketData() {
+  if (marketSyncing.value) return;
   marketSyncing.value = true;
   marketMessage.value = "";
   marketError.value = "";
@@ -565,7 +583,8 @@ async function syncMarketData() {
     const syncResult = await syncMarketKlines({
       symbol: marketSymbol.value,
       timeframe: marketTimeframe.value,
-      limit: 200,
+      limit: 2000,
+      range: "today_shanghai",
     });
     marketMessage.value = `同步完成：新增 ${syncResult.inserted}，更新 ${syncResult.updated}`;
     await refreshMarketSeries();
@@ -873,10 +892,21 @@ function liveMarketChartSource() {
   return {
     market_klines: marketSeries.value.klines.map((item) => ({
       ...item,
-      date: item.open_time,
+      date: formatShanghaiChartTime(item.open_time),
     })),
     trades: [],
   };
+}
+
+function formatShanghaiChartTime(value) {
+  return new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(value));
 }
 
 function renderChart(chart, source) {

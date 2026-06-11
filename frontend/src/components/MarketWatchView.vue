@@ -32,7 +32,7 @@
           自动观察
         </label>
       </div>
-      <p class="field-hint">自动观察每 10 秒从 Binance 拉取、入库并刷新；也可以手动同步最近 K 线。</p>
+      <p class="field-hint">加密货币 24 小时交易。这里以北京时间 00:00 为当日开盘，展示从今日开始到现在的 K 线，并每 10 秒更新。</p>
       <p v-if="message" class="success-message">{{ message }}</p>
       <p v-if="error" class="error-message">{{ error }}</p>
     </section>
@@ -43,11 +43,11 @@
         <strong>{{ formatMoney(series?.last_price) }}</strong>
       </article>
       <article class="metric">
-        <span>区间涨跌</span>
+        <span>今日涨跌</span>
         <strong>{{ formatPercent(series?.change_rate) }}</strong>
       </article>
       <article class="metric">
-        <span>已存 K 线</span>
+        <span>今日 K 线</span>
         <strong>{{ series?.count ?? 0 }}</strong>
       </article>
       <article class="metric">

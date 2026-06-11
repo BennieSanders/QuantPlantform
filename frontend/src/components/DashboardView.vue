@@ -21,7 +21,7 @@
 
     <section class="content-card">
       <div class="section-heading">
-        <h2>最近回测 K 线</h2>
+        <h2>历史回测 K 线（非实时）</h2>
         <span>{{ result?.symbol ?? "BTCUSDT" }} · {{ result?.timeframe ?? "1d" }}</span>
       </div>
       <div ref="chartRef" class="chart chart-market"></div>

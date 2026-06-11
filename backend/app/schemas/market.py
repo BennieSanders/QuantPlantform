@@ -10,7 +10,8 @@ MarketTimeframe = Literal["1m", "5m", "15m", "1h", "1d"]
 class MarketSyncRequest(BaseModel):
     symbol: MarketSymbol
     timeframe: MarketTimeframe = "1m"
-    limit: int = Field(default=200, ge=1, le=1000)
+    limit: int = Field(default=200, ge=1, le=2000)
+    range: Literal["latest", "today_shanghai"] = "latest"
 
 
 class MarketKlineResponse(BaseModel):

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 import json
 from typing import Callable
 from urllib.parse import urlencode
@@ -27,7 +27,16 @@ def sync_market_klines(
     db: Session,
     fetcher: KlineFetcher | None = None,
 ) -> MarketSyncResponse:
-    rows = (fetcher or fetch_binance_klines)(payload.symbol, payload.timeframe, payload.limit)
+    if fetcher:
+        rows = fetcher(payload.symbol, payload.timeframe, payload.limit)
+    else:
+        start_time = _shanghai_day_start_utc() if payload.range == "today_shanghai" else None
+        rows = fetch_binance_klines(
+            payload.symbol,
+            payload.timeframe,
+            payload.limit,
+            start_time=start_time,
+        )
     inserted = 0
     updated = 0
     latest_open_time: datetime | None = None
@@ -62,18 +71,19 @@ def get_market_series(
     symbol: str,
     timeframe: str,
     limit: int = 200,
+    range_name: str = "latest",
 ) -> MarketSeriesResponse:
-    limit = min(max(limit, 1), 1000)
+    limit = min(max(limit, 1), 2000)
+    query = select(MarketKline).where(
+        MarketKline.symbol == symbol.upper(),
+        MarketKline.timeframe == timeframe,
+    )
+    if range_name == "today_shanghai":
+        query = query.where(MarketKline.open_time >= _shanghai_day_start_utc())
     rows = list(
         reversed(
             db.scalars(
-                select(MarketKline)
-                .where(
-                    MarketKline.symbol == symbol.upper(),
-                    MarketKline.timeframe == timeframe,
-                )
-                .order_by(MarketKline.open_time.desc())
-                .limit(limit)
+                query.order_by(MarketKline.open_time.desc()).limit(limit)
             ).all()
         )
     )
@@ -95,18 +105,57 @@ def get_market_series(
     )
 
 
-def fetch_binance_klines(symbol: str, timeframe: str, limit: int) -> list[list]:
+def fetch_binance_klines(
+    symbol: str,
+    timeframe: str,
+    limit: int,
+    start_time: datetime | None = None,
+) -> list[list]:
     settings = get_settings()
-    query = urlencode({"symbol": symbol.upper(), "interval": timeframe, "limit": limit})
-    request = Request(
-        f"{settings.market_data_base_url}/api/v3/klines?{query}",
-        headers={"User-Agent": "quant-platform/0.1"},
+    remaining = min(max(limit, 1), 2000)
+    next_start_ms = int(start_time.timestamp() * 1000) if start_time else None
+    rows: list[list] = []
+
+    while remaining > 0:
+        request_limit = min(remaining, 1000)
+        params = {
+            "symbol": symbol.upper(),
+            "interval": timeframe,
+            "limit": request_limit,
+        }
+        if next_start_ms is not None:
+            params["startTime"] = next_start_ms
+        query = urlencode(params)
+        request = Request(
+            f"{settings.market_data_base_url}/api/v3/klines?{query}",
+            headers={"User-Agent": "quant-platform/0.1"},
+        )
+        with urlopen(request, timeout=settings.market_data_timeout_seconds) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        if not isinstance(payload, list):
+            raise ValueError("Market data provider returned an invalid response")
+        if not payload:
+            break
+
+        rows.extend(payload)
+        remaining -= len(payload)
+        if next_start_ms is None or len(payload) < request_limit:
+            break
+        next_start_ms = int(payload[-1][6]) + 1
+
+    return rows
+
+
+def _shanghai_day_start_utc(now: datetime | None = None) -> datetime:
+    current_utc = now or datetime.now(UTC)
+    shanghai_now = current_utc + timedelta(hours=8)
+    shanghai_midnight_as_utc = datetime(
+        shanghai_now.year,
+        shanghai_now.month,
+        shanghai_now.day,
+        tzinfo=UTC,
     )
-    with urlopen(request, timeout=settings.market_data_timeout_seconds) as response:
-        payload = json.loads(response.read().decode("utf-8"))
-    if not isinstance(payload, list):
-        raise ValueError("Market data provider returned an invalid response")
-    return payload
+    return shanghai_midnight_as_utc - timedelta(hours=8)
 
 
 def _parse_binance_row(symbol: str, timeframe: str, row: list, now: datetime) -> dict:

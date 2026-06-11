@@ -106,8 +106,8 @@ export async function getBacktest(id) {
   return parseResponse(response);
 }
 
-export async function getMarketKlines(symbol, timeframe, limit = 200) {
-  const query = new URLSearchParams({ symbol, timeframe, limit: String(limit) });
+export async function getMarketKlines(symbol, timeframe, limit = 200, range = "latest") {
+  const query = new URLSearchParams({ symbol, timeframe, limit: String(limit), range });
   const response = await fetch(`${API_BASE_URL}/api/market/klines?${query}`, {
     headers: authHeaders(),
   });
