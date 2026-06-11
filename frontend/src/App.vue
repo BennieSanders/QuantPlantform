@@ -21,6 +21,13 @@
           {{ item.label }}
         </button>
       </nav>
+
+      <div class="account-box">
+        <span>{{ currentUser?.username ?? "未登录" }}</span>
+        <button class="link-button sidebar-link" type="button" @click="activeView = 'account'">
+          账户
+        </button>
+      </div>
     </aside>
 
     <section class="main-panel">
@@ -29,326 +36,188 @@
           <p class="eyebrow">{{ currentView.eyebrow }}</p>
           <h1>{{ currentView.title }}</h1>
         </div>
-        <div class="status-pill">现货做多 · CSV 数据</div>
+        <div class="topbar-actions">
+          <div class="status-pill">现货做多 · 历史回测 + 实时行情</div>
+          <button v-if="currentUser" class="secondary-button" type="button" @click="logout">
+            退出
+          </button>
+        </div>
       </header>
 
-      <section v-if="activeView === 'dashboard'" class="view-stack">
-        <div class="summary-grid">
-          <article class="metric">
-            <span>最近总收益率</span>
-            <strong>{{ formatPercent(result?.metrics.total_return) }}</strong>
-          </article>
-          <article class="metric">
-            <span>年化收益率</span>
-            <strong>{{ formatPercent(result?.metrics.annualized_return) }}</strong>
-          </article>
-          <article class="metric">
-            <span>最终权益</span>
-            <strong>{{ formatMoney(result?.metrics.final_equity) }}</strong>
-          </article>
-          <article class="metric">
-            <span>夏普比率</span>
-            <strong>{{ formatNumber(result?.metrics.sharpe_ratio) }}</strong>
-          </article>
-        </div>
+      <AccountView
+        v-if="activeView === 'account'"
+        :auth-token="authToken"
+        :current-user="currentUser"
+        :error="authError"
+        :form="authForm"
+        :loading="authLoading"
+        :message="authMessage"
+        :mode="authMode"
+        @submit-auth="submitAuth"
+        @toggle-mode="toggleAuthMode"
+        @update-form="updateAuthForm"
+      />
 
-        <section class="content-card">
-          <div class="section-heading">
-            <h2>最近回测权益曲线</h2>
-            <span>{{ result?.symbol ?? "BTCUSDT" }} · {{ result?.timeframe ?? "1d" }}</span>
-          </div>
-          <div ref="dashboardChartRef" class="chart"></div>
-        </section>
+      <DashboardView
+        v-if="activeView === 'dashboard'"
+        :recent-backtests="recentBacktests"
+        :result="result"
+        @chart-ready="setDashboardChartRef"
+      />
 
-        <section class="content-card">
-          <div class="section-heading">
-            <h2>最近回测记录</h2>
-            <span>{{ recentBacktests.length }} 条</span>
-          </div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>时间</th>
-                  <th>标的</th>
-                  <th>策略</th>
-                  <th>收益率</th>
-                  <th>最大回撤</th>
-                  <th>最终权益</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="record in recentBacktests" :key="record.id">
-                  <td>{{ formatDateTime(record.created_at) }}</td>
-                  <td>{{ record.symbol }} · {{ record.timeframe }}</td>
-                  <td>{{ record.strategy_name }}</td>
-                  <td>{{ formatPercent(record.metrics.total_return) }}</td>
-                  <td>{{ formatPercent(record.metrics.max_drawdown) }}</td>
-                  <td>{{ formatMoney(record.metrics.final_equity) }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
-      </section>
+      <HistoryView
+        v-if="activeView === 'history'"
+        :recent-backtests="recentBacktests"
+        :selected-history-id="selectedHistoryId"
+        :selected-history-result="selectedHistoryResult"
+        @chart-ready="setHistoryChartRefs"
+        @load-record="loadBacktestRecord"
+        @refresh="refreshBacktests"
+      />
 
-      <section v-if="activeView === 'history'" class="history-layout">
-        <section class="content-card">
-          <div class="section-heading">
-            <h2>回测历史</h2>
-            <button class="secondary-button" type="button" @click="refreshBacktests">刷新</button>
-          </div>
-          <div class="table-wrap history-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>时间</th>
-                  <th>标的</th>
-                  <th>策略</th>
-                  <th>收益率</th>
-                  <th>最大回撤</th>
-                  <th>夏普</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="record in recentBacktests"
-                  :key="record.id"
-                  :class="{ selected: selectedHistoryId === record.id }"
-                  class="clickable-row"
-                  @click="loadBacktestRecord(record.id)"
-                >
-                  <td>{{ formatDateTime(record.created_at) }}</td>
-                  <td>{{ record.symbol }} · {{ record.timeframe }}</td>
-                  <td>{{ record.strategy_name }}</td>
-                  <td>{{ formatPercent(record.metrics.total_return) }}</td>
-                  <td>{{ formatPercent(record.metrics.max_drawdown) }}</td>
-                  <td>{{ formatNumber(record.metrics.sharpe_ratio) }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
+      <JobHistoryView
+        v-if="activeView === 'jobs'"
+        :error="jobError"
+        :jobs="recentJobs"
+        :message="jobMessage"
+        @cancel-job="cancelJob"
+        @open-result="openJobResult"
+        @refresh="refreshJobs"
+        @retry-job="retryJob"
+      />
 
-        <section class="content-card history-detail">
-          <div class="section-heading">
-            <h2>历史详情</h2>
-            <span>{{ selectedHistoryResult?.backtest_id ?? "请选择一条记录" }}</span>
-          </div>
+      <BacktestView
+        v-if="activeView === 'backtest'"
+        :active-job="activeBacktestJob"
+        :error="errorMessage"
+        :form="form"
+        :loading="loading"
+        :message="backtestMessage"
+        :result="result"
+        :strategies="strategies"
+        :strategy-param-fields="strategyParamFields"
+        @chart-ready="setBacktestChartRefs"
+        @select-strategy-id="selectStrategyById"
+        @submit-backtest="submitBacktest"
+        @update-form="updateBacktestForm"
+      />
 
-          <div class="summary-grid">
-            <article class="metric">
-              <span>总收益率</span>
-              <strong>{{ formatPercent(selectedHistoryResult?.metrics.total_return) }}</strong>
-            </article>
-            <article class="metric">
-              <span>年化收益率</span>
-              <strong>{{ formatPercent(selectedHistoryResult?.metrics.annualized_return) }}</strong>
-            </article>
-            <article class="metric">
-              <span>最大回撤</span>
-              <strong>{{ formatPercent(selectedHistoryResult?.metrics.max_drawdown) }}</strong>
-            </article>
-            <article class="metric">
-              <span>交易次数</span>
-              <strong>{{ selectedHistoryResult?.metrics.trade_count ?? "-" }}</strong>
-            </article>
-          </div>
+      <MarketWatchView
+        v-if="activeView === 'market'"
+        :auto-refresh="marketAutoRefresh"
+        :error="marketError"
+        :message="marketMessage"
+        :series="marketSeries"
+        :symbol="marketSymbol"
+        :syncing="marketSyncing"
+        :timeframe="marketTimeframe"
+        @chart-ready="setLiveMarketChartRef"
+        @refresh="refreshMarketSeries"
+        @sync="syncMarketData"
+        @toggle-auto-refresh="toggleMarketAutoRefresh"
+        @update-symbol="updateMarketSymbol"
+        @update-timeframe="updateMarketTimeframe"
+      />
 
-          <div ref="historyChartRef" class="chart"></div>
-          <TradeTable :trades="selectedHistoryResult?.trades ?? []" />
-        </section>
-      </section>
+      <AiAnalysisView
+        v-if="activeView === 'ai'"
+        :analyses="aiAnalyses"
+        :analysis="aiAnalysis"
+        :backtests="recentBacktests"
+        :error="aiError"
+        :loading="aiLoading"
+        :selected-backtest-id="aiBacktestId"
+        @analyze="runAiAnalysis"
+        @open-analysis="aiAnalysis = $event"
+        @select-backtest="selectAiBacktest"
+      />
 
-      <section v-if="activeView === 'backtest'" class="workspace">
-        <aside class="control-panel">
-          <form class="form-grid" @submit.prevent="submitBacktest">
-            <label>
-              交易标的
-              <select v-model="form.symbol">
-                <option value="BTCUSDT">BTCUSDT</option>
-                <option value="ETHUSDT">ETHUSDT</option>
-              </select>
-            </label>
-
-            <label>
-              策略
-              <select v-model="form.strategyId" @change="syncSelectedStrategyFromForm">
-                <option v-for="strategy in strategies" :key="strategy.id" :value="strategy.id">
-                  {{ strategy.name }}
-                </option>
-              </select>
-            </label>
-
-            <label>
-              K 线周期
-              <select v-model="form.timeframe">
-                <option value="1d">日线</option>
-              </select>
-            </label>
-
-            <label>
-              开始日期
-              <input v-model="form.startDate" type="date" />
-            </label>
-
-            <label>
-              结束日期
-              <input v-model="form.endDate" type="date" />
-            </label>
-
-            <p class="field-hint">示例 CSV 当前只覆盖 2024-01-01 到 2024-12-31。</p>
-
-            <label>
-              初始资金
-              <input v-model.number="form.initialCash" min="100" step="100" type="number" />
-            </label>
-
-            <label v-for="field in strategyParamFields" :key="field.key">
-              {{ field.label }}
-              <input
-                v-model.number="form.params[field.key]"
-                :min="field.min"
-                :step="field.step"
-                type="number"
-              />
-            </label>
-
-            <button :disabled="loading" type="submit">
-              {{ loading ? "回测中..." : "运行回测" }}
-            </button>
-          </form>
-
-          <p v-if="backtestMessage" class="success-message">{{ backtestMessage }}</p>
-          <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
-        </aside>
-
-        <section class="result-panel">
-          <div class="summary-grid">
-            <article class="metric">
-              <span>总收益率</span>
-              <strong>{{ formatPercent(result?.metrics.total_return) }}</strong>
-            </article>
-            <article class="metric">
-              <span>年化收益率</span>
-              <strong>{{ formatPercent(result?.metrics.annualized_return) }}</strong>
-            </article>
-            <article class="metric">
-              <span>最终权益</span>
-              <strong>{{ formatMoney(result?.metrics.final_equity) }}</strong>
-            </article>
-            <article class="metric">
-              <span>夏普比率</span>
-              <strong>{{ formatNumber(result?.metrics.sharpe_ratio) }}</strong>
-            </article>
-          </div>
-
-          <div ref="backtestChartRef" class="chart"></div>
-
-          <TradeTable :trades="result?.trades ?? []" />
-        </section>
-      </section>
-
-      <section v-if="activeView === 'strategies'" class="strategy-layout">
-        <section class="content-card strategy-list">
-          <div class="section-heading">
-            <h2>策略列表</h2>
-            <button class="secondary-button" type="button" @click="newStrategy">新建策略</button>
-          </div>
-
-          <button
-            v-for="strategy in strategies"
-            :key="strategy.id"
-            :class="{ active: selectedStrategy?.id === strategy.id }"
-            class="strategy-item"
-            type="button"
-            @click="selectStrategy(strategy)"
-          >
-            <span>
-              <strong>{{ strategy.name }}</strong>
-              <button class="link-button" type="button" @click.stop="copyStrategy(strategy)">复制</button>
-            </span>
-            <small>{{ formatStrategyType(strategy.strategy_type) }} · {{ formatStatus(strategy.status) }}</small>
-          </button>
-        </section>
-
-        <section class="content-card strategy-editor">
-          <div class="section-heading">
-            <h2>策略编辑</h2>
-            <span>{{ selectedStrategy?.id ?? "未保存" }}</span>
-          </div>
-
-          <form class="editor-grid" @submit.prevent="saveStrategy">
-            <label>
-              策略名称
-              <input v-model="strategyDraft.name" />
-            </label>
-
-            <label>
-              策略说明
-              <input v-model="strategyDraft.description" />
-            </label>
-
-            <label>
-              状态
-              <select v-model="strategyDraft.status">
-                <option value="draft">草稿</option>
-                <option value="active">启用</option>
-                <option value="archived">归档</option>
-              </select>
-            </label>
-
-            <label>
-              默认参数 JSON
-              <textarea v-model="strategyDraft.paramsText" class="params-editor"></textarea>
-            </label>
-
-            <label class="code-field">
-              策略代码
-              <textarea v-model="strategyDraft.code" class="code-editor" spellcheck="false"></textarea>
-            </label>
-
-            <div class="editor-actions">
-              <button :disabled="strategySaving" type="submit">
-                {{ strategySaving ? "保存中..." : "保存策略" }}
-              </button>
-              <button
-                v-if="selectedStrategy?.strategy_type === 'builtin'"
-                class="secondary-button"
-                type="button"
-                @click="copyStrategy(selectedStrategy)"
-              >
-                复制为自定义策略
-              </button>
-              <button
-                v-if="selectedStrategy && selectedStrategy.strategy_type !== 'builtin'"
-                class="danger-button"
-                type="button"
-                @click="removeSelectedStrategy"
-              >
-                删除策略
-              </button>
-            </div>
-          </form>
-
-          <p v-if="strategyMessage" class="success-message">{{ strategyMessage }}</p>
-          <p v-if="strategyError" class="error-message">{{ strategyError }}</p>
-        </section>
-      </section>
+      <StrategyManagerView
+        v-if="activeView === 'strategies'"
+        :draft="strategyDraft"
+        :error="strategyError"
+        :message="strategyMessage"
+        :saving="strategySaving"
+        :selected-strategy="selectedStrategy"
+        :strategies="strategies"
+        @copy-strategy="copyStrategy"
+        @new-strategy="newStrategy"
+        @remove-strategy="removeSelectedStrategy"
+        @save-strategy="saveStrategy"
+        @select-strategy="selectStrategy"
+        @update-draft="updateStrategyDraft"
+      />
     </section>
   </main>
 </template>
 
 <script setup>
-import * as echarts from "echarts";
-import { computed, defineComponent, h, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
-import { createStrategy, deleteStrategy, getBacktest, listBacktests, listStrategies, runBacktest, updateStrategy } from "./api";
+import { BarChart, CandlestickChart, LineChart } from "echarts/charts";
+import {
+  DataZoomComponent,
+  GridComponent,
+  LegendComponent,
+  MarkPointComponent,
+  TooltipComponent,
+} from "echarts/components";
+import * as echarts from "echarts/core";
+import { CanvasRenderer } from "echarts/renderers";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import {
+  analyzeBacktest,
+  cancelBacktestJob,
+  clearStoredToken,
+  createBacktestJob,
+  createStrategy,
+  deleteStrategy,
+  getBacktest,
+  getBacktestJob,
+  getCurrentUser,
+  getMarketKlines,
+  getStoredToken,
+  listBacktestAnalyses,
+  listBacktestJobs,
+  listBacktests,
+  listStrategies,
+  loginUser,
+  registerUser,
+  retryBacktestJob,
+  setStoredToken,
+  syncMarketKlines,
+  updateStrategy,
+} from "./api";
+import AccountView from "./components/AccountView.vue";
+import AiAnalysisView from "./components/AiAnalysisView.vue";
+import BacktestView from "./components/BacktestView.vue";
+import DashboardView from "./components/DashboardView.vue";
+import HistoryView from "./components/HistoryView.vue";
+import JobHistoryView from "./components/JobHistoryView.vue";
+import MarketWatchView from "./components/MarketWatchView.vue";
+import StrategyManagerView from "./components/StrategyManagerView.vue";
+import { buildEquityChartOption, buildMarketChartOption } from "./utils/chartOptions";
+import { formatMoney, formatParamLabel, getParamMin } from "./utils/formatters";
+
+echarts.use([
+  BarChart,
+  CandlestickChart,
+  CanvasRenderer,
+  DataZoomComponent,
+  GridComponent,
+  LegendComponent,
+  LineChart,
+  MarkPointComponent,
+  TooltipComponent,
+]);
 
 const navItems = [
   { key: "dashboard", label: "Dashboard", title: "系统总览", eyebrow: "Overview", icon: "□" },
   { key: "backtest", label: "回测中心", title: "回测中心", eyebrow: "Backtest", icon: "◧" },
   { key: "history", label: "回测历史", title: "回测历史", eyebrow: "History", icon: "≋" },
+  { key: "jobs", label: "任务中心", title: "任务中心", eyebrow: "Jobs", icon: "◇" },
+  { key: "market", label: "实时行情", title: "实时行情观察", eyebrow: "Market Data", icon: "⌁" },
+  { key: "ai", label: "AI 分析", title: "AI 策略分析", eyebrow: "AI Analyst", icon: "✦" },
   { key: "strategies", label: "策略管理", title: "策略管理", eyebrow: "Strategy CRUD", icon: "⌘" },
+  { key: "account", label: "账户", title: "账户", eyebrow: "Auth", icon: "◎" },
 ];
 
 const DEFAULT_CUSTOM_STRATEGY_CODE = `def generate_signals(klines, params):
@@ -370,51 +239,6 @@ const DEFAULT_CUSTOM_STRATEGY_CODE = `def generate_signals(klines, params):
     return []
 `;
 
-const TradeTable = defineComponent({
-  props: {
-    trades: {
-      type: Array,
-      required: true,
-    },
-  },
-  setup(props) {
-    return () =>
-      h("section", { class: "table-section" }, [
-        h("div", { class: "section-heading" }, [
-          h("h2", "交易记录"),
-          h("span", `${props.trades.length} 条记录`),
-        ]),
-        h("div", { class: "table-wrap" }, [
-          h("table", [
-            h("thead", [
-              h("tr", [
-                h("th", "日期"),
-                h("th", "方向"),
-                h("th", "价格"),
-                h("th", "数量"),
-                h("th", "手续费"),
-              ]),
-            ]),
-            h(
-              "tbody",
-              props.trades.map((trade) =>
-                h("tr", { key: `${trade.date}-${trade.side}` }, [
-                  h("td", trade.date),
-                  h("td", [
-                    h("span", { class: ["side", trade.side] }, formatSide(trade.side)),
-                  ]),
-                  h("td", formatMoney(trade.price)),
-                  h("td", trade.quantity.toFixed(6)),
-                  h("td", formatMoney(trade.fee)),
-                ]),
-              ),
-            ),
-          ]),
-        ]),
-      ]);
-  },
-});
-
 const activeView = ref("dashboard");
 const currentView = computed(
   () => navItems.find((item) => item.key === activeView.value) ?? navItems[0],
@@ -432,13 +256,20 @@ const strategyParamFields = computed(() =>
 );
 
 const dashboardChartRef = ref(null);
+const marketChartRef = ref(null);
 const backtestChartRef = ref(null);
+const historyMarketChartRef = ref(null);
 const historyChartRef = ref(null);
+const liveMarketChartRef = ref(null);
 const loading = ref(false);
 const errorMessage = ref("");
 const backtestMessage = ref("");
+const activeBacktestJob = ref(null);
 const result = ref(null);
 const recentBacktests = ref([]);
+const recentJobs = ref([]);
+const jobMessage = ref("");
+const jobError = ref("");
 const selectedHistoryId = ref("");
 const selectedHistoryResult = ref(null);
 const strategies = ref([]);
@@ -446,9 +277,32 @@ const selectedStrategy = ref(null);
 const strategySaving = ref(false);
 const strategyMessage = ref("");
 const strategyError = ref("");
+const marketSymbol = ref("BTCUSDT");
+const marketTimeframe = ref("1m");
+const marketSeries = ref(null);
+const marketSyncing = ref(false);
+const marketAutoRefresh = ref(false);
+const marketMessage = ref("");
+const marketError = ref("");
+const aiBacktestId = ref("");
+const aiAnalysis = ref(null);
+const aiAnalyses = ref([]);
+const aiLoading = ref(false);
+const aiError = ref("");
+const currentUser = ref(null);
+const authToken = ref(getStoredToken());
+const authMode = ref("login");
+const authLoading = ref(false);
+const authMessage = ref("");
+const authError = ref("");
 let dashboardChart = null;
+let marketChart = null;
 let backtestChart = null;
+let historyMarketChart = null;
 let historyChart = null;
+let liveMarketChart = null;
+let backtestJobPollTimer = null;
+let marketPollTimer = null;
 
 const form = reactive({
   symbol: "BTCUSDT",
@@ -468,24 +322,120 @@ const strategyDraft = reactive({
   paramsText: "{}",
 });
 
+const authForm = reactive({
+  username: "",
+  password: "",
+});
+
 onMounted(async () => {
-  await refreshStrategies();
-  await submitBacktest();
+  await initializeApp();
   window.addEventListener("resize", resizeCharts);
 });
 
 onBeforeUnmount(() => {
+  stopBacktestJobPolling();
+  stopMarketPolling();
   window.removeEventListener("resize", resizeCharts);
   dashboardChart?.dispose();
+  marketChart?.dispose();
   backtestChart?.dispose();
+  historyMarketChart?.dispose();
   historyChart?.dispose();
+  liveMarketChart?.dispose();
 });
 
 watch(activeView, async () => {
+  if (activeView.value === "market") await refreshMarketSeries();
+  if (activeView.value === "ai" && aiBacktestId.value) await refreshAiAnalyses();
   await nextTick();
   ensureCharts();
   renderCharts();
 });
+
+async function initializeApp() {
+  try {
+    currentUser.value = await getCurrentUser();
+    await refreshStrategies();
+    await refreshJobs();
+    await refreshBacktests();
+    await submitBacktest();
+  } catch (error) {
+    authError.value = error.message;
+    activeView.value = "account";
+  }
+}
+
+function toggleAuthMode() {
+  authMode.value = authMode.value === "login" ? "register" : "login";
+  authMessage.value = "";
+  authError.value = "";
+}
+
+function updateAuthForm(nextForm) {
+  authForm.username = nextForm.username;
+  authForm.password = nextForm.password;
+}
+
+async function submitAuth() {
+  authLoading.value = true;
+  authMessage.value = "";
+  authError.value = "";
+
+  try {
+    if (authMode.value === "register") {
+      await registerUser({
+        username: authForm.username,
+        password: authForm.password,
+      });
+      authMode.value = "login";
+      authMessage.value = "注册成功，请登录";
+      return;
+    }
+
+    const loginResult = await loginUser({
+      username: authForm.username,
+      password: authForm.password,
+    });
+    setStoredToken(loginResult.access_token);
+    authToken.value = loginResult.access_token;
+    currentUser.value = loginResult.user;
+    authForm.password = "";
+    authMessage.value = "登录成功";
+    await refreshStrategies();
+    await refreshJobs();
+    await submitBacktest();
+    activeView.value = "dashboard";
+  } catch (error) {
+    authError.value = error.message;
+  } finally {
+    authLoading.value = false;
+  }
+}
+
+async function logout() {
+  stopBacktestJobPolling();
+  stopMarketPolling();
+  clearStoredToken();
+  authToken.value = "";
+  currentUser.value = null;
+  result.value = null;
+  recentBacktests.value = [];
+  recentJobs.value = [];
+  jobMessage.value = "";
+  jobError.value = "";
+  selectedHistoryId.value = "";
+  selectedHistoryResult.value = null;
+  activeBacktestJob.value = null;
+  strategies.value = [];
+  selectedStrategy.value = null;
+  marketSeries.value = null;
+  marketAutoRefresh.value = false;
+  aiAnalysis.value = null;
+  aiAnalyses.value = [];
+  activeView.value = "account";
+  authMessage.value = "已退出";
+  authError.value = "";
+}
 
 async function refreshStrategies() {
   strategies.value = await listStrategies();
@@ -498,6 +448,7 @@ async function submitBacktest() {
   errorMessage.value = "";
   backtestMessage.value = "";
   loading.value = true;
+  stopBacktestJobPolling();
 
   try {
     const strategy = strategies.value.find((item) => item.id === form.strategyId) ?? selectedStrategy.value;
@@ -515,23 +466,216 @@ async function submitBacktest() {
       params: { ...form.params },
     };
 
-    result.value = await runBacktest(payload);
-    backtestMessage.value = `回测完成：${result.value.backtest_id} · ${strategy?.name ?? result.value.strategy} · ${result.value.metrics.trade_count} 笔交易 · 最终权益 ${formatMoney(result.value.metrics.final_equity)}`;
-    selectedHistoryId.value = result.value.backtest_id;
-    selectedHistoryResult.value = result.value;
-    await refreshBacktests();
-    await nextTick();
-    ensureCharts();
-    renderCharts();
+    activeBacktestJob.value = await createBacktestJob(payload);
+    backtestMessage.value = `任务已创建：${activeBacktestJob.value.id} · ${formatJobStatus(activeBacktestJob.value.status)}`;
+    await refreshJobs();
+    startBacktestJobPolling(activeBacktestJob.value.id, strategy);
   } catch (error) {
     errorMessage.value = error.message;
-  } finally {
     loading.value = false;
   }
 }
 
+function startBacktestJobPolling(jobId, strategy) {
+  backtestJobPollTimer = window.setInterval(async () => {
+    await pollBacktestJob(jobId, strategy);
+  }, 800);
+  pollBacktestJob(jobId, strategy);
+}
+
+async function pollBacktestJob(jobId, strategy) {
+  try {
+    const job = await getBacktestJob(jobId);
+    activeBacktestJob.value = job;
+    backtestMessage.value = `任务 ${job.id} · ${formatJobStatus(job.status)}`;
+
+    if (job.status === "succeeded") {
+      stopBacktestJobPolling();
+      if (!job.result_backtest_id) {
+        throw new Error("Backtest job succeeded without a result id");
+      }
+      result.value = await getBacktest(job.result_backtest_id);
+      backtestMessage.value = `回测完成：${result.value.backtest_id} · ${strategy?.name ?? result.value.strategy} · ${result.value.metrics.trade_count} 笔交易 · 最终权益 ${formatMoney(result.value.metrics.final_equity)}`;
+      selectedHistoryId.value = result.value.backtest_id;
+      selectedHistoryResult.value = result.value;
+      await refreshBacktests();
+      await refreshJobs();
+      await nextTick();
+      ensureCharts();
+      renderCharts();
+      loading.value = false;
+      return;
+    }
+
+    if (job.status === "failed" || job.status === "cancelled") {
+      stopBacktestJobPolling();
+      errorMessage.value = job.error_message || `Backtest job ${job.status}`;
+      await refreshJobs();
+      loading.value = false;
+    }
+  } catch (error) {
+    stopBacktestJobPolling();
+    errorMessage.value = error.message;
+    loading.value = false;
+  }
+}
+
+function stopBacktestJobPolling() {
+  if (backtestJobPollTimer) {
+    window.clearInterval(backtestJobPollTimer);
+    backtestJobPollTimer = null;
+  }
+}
+
+function formatJobStatus(status) {
+  const labels = {
+    queued: "排队中",
+    running: "运行中",
+    succeeded: "已完成",
+    failed: "失败",
+    cancelled: "已取消",
+  };
+  return labels[status] ?? status;
+}
+
 async function refreshBacktests() {
   recentBacktests.value = await listBacktests(20);
+  if (!aiBacktestId.value && recentBacktests.value.length > 0) {
+    aiBacktestId.value = recentBacktests.value[0].id;
+  }
+}
+
+async function refreshMarketSeries() {
+  marketError.value = "";
+  try {
+    marketSeries.value = await getMarketKlines(marketSymbol.value, marketTimeframe.value, 200);
+    await nextTick();
+    ensureCharts();
+    renderCharts();
+  } catch (error) {
+    marketError.value = error.message;
+  }
+}
+
+async function syncMarketData() {
+  marketSyncing.value = true;
+  marketMessage.value = "";
+  marketError.value = "";
+  try {
+    const syncResult = await syncMarketKlines({
+      symbol: marketSymbol.value,
+      timeframe: marketTimeframe.value,
+      limit: 200,
+    });
+    marketMessage.value = `同步完成：新增 ${syncResult.inserted}，更新 ${syncResult.updated}`;
+    await refreshMarketSeries();
+  } catch (error) {
+    marketError.value = error.message;
+  } finally {
+    marketSyncing.value = false;
+  }
+}
+
+function updateMarketSymbol(value) {
+  marketSymbol.value = value;
+  refreshMarketSeries();
+}
+
+function updateMarketTimeframe(value) {
+  marketTimeframe.value = value;
+  refreshMarketSeries();
+}
+
+function toggleMarketAutoRefresh(enabled) {
+  marketAutoRefresh.value = enabled;
+  stopMarketPolling();
+  if (enabled) {
+    syncMarketData();
+    marketPollTimer = window.setInterval(syncMarketData, 10000);
+  }
+}
+
+function stopMarketPolling() {
+  if (marketPollTimer) {
+    window.clearInterval(marketPollTimer);
+    marketPollTimer = null;
+  }
+}
+
+async function selectAiBacktest(id) {
+  aiBacktestId.value = id;
+  aiAnalysis.value = null;
+  await refreshAiAnalyses();
+}
+
+async function refreshAiAnalyses() {
+  if (!aiBacktestId.value) {
+    aiAnalyses.value = [];
+    return;
+  }
+  aiError.value = "";
+  try {
+    aiAnalyses.value = await listBacktestAnalyses(aiBacktestId.value);
+    if (!aiAnalysis.value && aiAnalyses.value.length > 0) {
+      aiAnalysis.value = aiAnalyses.value[0];
+    }
+  } catch (error) {
+    aiError.value = error.message;
+  }
+}
+
+async function runAiAnalysis() {
+  if (!aiBacktestId.value) return;
+  aiLoading.value = true;
+  aiError.value = "";
+  try {
+    aiAnalysis.value = await analyzeBacktest(aiBacktestId.value);
+    await refreshAiAnalyses();
+  } catch (error) {
+    aiError.value = error.message;
+  } finally {
+    aiLoading.value = false;
+  }
+}
+
+async function refreshJobs() {
+  recentJobs.value = await listBacktestJobs(30);
+}
+
+async function cancelJob(jobId) {
+  jobError.value = "";
+  jobMessage.value = "";
+  try {
+    const job = await cancelBacktestJob(jobId);
+    jobMessage.value = `任务 ${job.id} 已请求取消`;
+    if (activeBacktestJob.value?.id === job.id) {
+      activeBacktestJob.value = job;
+      if (job.status === "cancelled") {
+        stopBacktestJobPolling();
+        loading.value = false;
+      }
+    }
+    await refreshJobs();
+  } catch (error) {
+    jobError.value = error.message;
+  }
+}
+
+async function retryJob(jobId) {
+  jobError.value = "";
+  jobMessage.value = "";
+  try {
+    const job = await retryBacktestJob(jobId);
+    jobMessage.value = `已创建重试任务：${job.id}`;
+    await refreshJobs();
+  } catch (error) {
+    jobError.value = error.message;
+  }
+}
+
+async function openJobResult(backtestId) {
+  await loadBacktestRecord(backtestId);
+  activeView.value = "history";
 }
 
 async function loadBacktestRecord(id) {
@@ -553,9 +697,27 @@ function selectStrategy(strategy) {
   form.params = { ...strategy.default_params };
 }
 
-function syncSelectedStrategyFromForm() {
-  const strategy = strategies.value.find((item) => item.id === form.strategyId);
+function selectStrategyById(strategyId) {
+  const strategy = strategies.value.find((item) => item.id === strategyId);
   if (strategy) selectStrategy(strategy);
+}
+
+function updateBacktestForm(nextForm) {
+  form.symbol = nextForm.symbol;
+  form.strategyId = nextForm.strategyId;
+  form.timeframe = nextForm.timeframe;
+  form.startDate = nextForm.startDate;
+  form.endDate = nextForm.endDate;
+  form.initialCash = nextForm.initialCash;
+  form.params = { ...nextForm.params };
+}
+
+function updateStrategyDraft(nextDraft) {
+  strategyDraft.name = nextDraft.name;
+  strategyDraft.description = nextDraft.description;
+  strategyDraft.status = nextDraft.status;
+  strategyDraft.code = nextDraft.code;
+  strategyDraft.paramsText = nextDraft.paramsText;
 }
 
 function newStrategy() {
@@ -630,151 +792,115 @@ function ensureCharts() {
   if (dashboardChartRef.value && !dashboardChart) {
     dashboardChart = echarts.init(dashboardChartRef.value);
   }
+  if (marketChartRef.value && !marketChart) {
+    marketChart = echarts.init(marketChartRef.value);
+  }
   if (backtestChartRef.value && !backtestChart) {
     backtestChart = echarts.init(backtestChartRef.value);
+  }
+  if (historyMarketChartRef.value && !historyMarketChart) {
+    historyMarketChart = echarts.init(historyMarketChartRef.value);
   }
   if (historyChartRef.value && !historyChart) {
     historyChart = echarts.init(historyChartRef.value);
   }
+  if (liveMarketChartRef.value && !liveMarketChart) {
+    liveMarketChart = echarts.init(liveMarketChartRef.value);
+  }
+}
+
+function setDashboardChartRef(element) {
+  if (dashboardChartRef.value !== element) {
+    dashboardChart?.dispose();
+    dashboardChart = null;
+    dashboardChartRef.value = element;
+  }
+  ensureCharts();
+  renderCharts();
+}
+
+function setBacktestChartRefs(elements) {
+  if (marketChartRef.value !== elements.market) {
+    marketChart?.dispose();
+    marketChart = null;
+    marketChartRef.value = elements.market;
+  }
+  if (backtestChartRef.value !== elements.equity) {
+    backtestChart?.dispose();
+    backtestChart = null;
+    backtestChartRef.value = elements.equity;
+  }
+  ensureCharts();
+  renderCharts();
+}
+
+function setHistoryChartRefs(elements) {
+  if (historyMarketChartRef.value !== elements.market) {
+    historyMarketChart?.dispose();
+    historyMarketChart = null;
+    historyMarketChartRef.value = elements.market;
+  }
+  if (historyChartRef.value !== elements.equity) {
+    historyChart?.dispose();
+    historyChart = null;
+    historyChartRef.value = elements.equity;
+  }
+  ensureCharts();
+  renderCharts();
+}
+
+function setLiveMarketChartRef(element) {
+  if (liveMarketChartRef.value !== element) {
+    liveMarketChart?.dispose();
+    liveMarketChart = null;
+    liveMarketChartRef.value = element;
+  }
+  ensureCharts();
+  renderCharts();
 }
 
 function renderCharts() {
   renderChart(dashboardChart, result.value);
+  renderMarketChart(marketChart, result.value);
   renderChart(backtestChart, result.value);
+  renderMarketChart(historyMarketChart, selectedHistoryResult.value);
   renderChart(historyChart, selectedHistoryResult.value);
+  renderMarketChart(liveMarketChart, liveMarketChartSource());
+}
+
+function liveMarketChartSource() {
+  if (!marketSeries.value) return null;
+  return {
+    market_klines: marketSeries.value.klines.map((item) => ({
+      ...item,
+      date: item.open_time,
+    })),
+    trades: [],
+  };
 }
 
 function renderChart(chart, source) {
   if (!chart || !source) return;
+  chart.setOption(buildEquityChartOption(source));
+}
 
-  const dates = source.equity_curve.map((point) => point.date);
-  const values = source.equity_curve.map((point) => point.equity);
-
-  chart.setOption({
-    color: ["#0f766e"],
-    tooltip: {
-      trigger: "axis",
-      valueFormatter: (value) => formatMoney(value),
-    },
-    grid: {
-      left: 56,
-      right: 24,
-      top: 32,
-      bottom: 48,
-    },
-    xAxis: {
-      type: "category",
-      data: dates,
-      boundaryGap: false,
-      axisLabel: { color: "#64748b" },
-    },
-    yAxis: {
-      type: "value",
-      scale: true,
-      axisLabel: {
-        color: "#64748b",
-        formatter: (value) => `${Math.round(value)}`,
-      },
-      splitLine: { lineStyle: { color: "#e2e8f0" } },
-    },
-    series: [
-      {
-        name: "权益曲线",
-        type: "line",
-        smooth: true,
-        showSymbol: false,
-        lineStyle: { width: 3 },
-        areaStyle: {
-          color: {
-            type: "linear",
-            x: 0,
-            y: 0,
-            x2: 0,
-            y2: 1,
-            colorStops: [
-              { offset: 0, color: "rgba(15, 118, 110, 0.24)" },
-              { offset: 1, color: "rgba(15, 118, 110, 0.02)" },
-            ],
-          },
-        },
-        data: values,
-      },
-    ],
-  });
+function renderMarketChart(chart, source) {
+  if (!chart || !source || !source.market_klines?.length) return;
+  chart.setOption(buildMarketChartOption(source));
 }
 
 function resizeCharts() {
   dashboardChart?.resize();
+  marketChart?.resize();
   backtestChart?.resize();
+  historyMarketChart?.resize();
   historyChart?.resize();
-}
-
-function formatPercent(value) {
-  if (value === undefined || value === null) return "-";
-  return `${(value * 100).toFixed(2)}%`;
-}
-
-function formatMoney(value) {
-  if (value === undefined || value === null) return "-";
-  return `${Number(value).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })} USDT`;
-}
-
-function formatNumber(value) {
-  if (value === undefined || value === null) return "-";
-  return Number(value).toFixed(2);
-}
-
-function formatDateTime(value) {
-  if (!value) return "-";
-  return new Date(value).toLocaleString(undefined, {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function formatSide(side) {
-  if (side === "buy") return "买入";
-  if (side === "sell") return "卖出";
-  return side;
-}
-
-function formatStrategyType(type) {
-  if (type === "builtin") return "内置";
-  if (type === "custom_code") return "自定义";
-  return type;
-}
-
-function formatStatus(status) {
-  if (status === "active") return "启用";
-  if (status === "draft") return "草稿";
-  if (status === "archived") return "归档";
-  return status;
+  liveMarketChart?.resize();
 }
 
 function getStrategyKind(strategy) {
   if (strategy?.strategy_type === "custom_code") return "custom_code";
   if (strategy?.id === "rsi-reversal-default") return "rsi_reversal";
   return "ma_cross";
-}
-
-function formatParamLabel(key) {
-  const labels = {
-    short_window: "短均线周期",
-    long_window: "长均线周期",
-    period: "RSI 周期",
-    oversold: "超卖阈值",
-    overbought: "超买阈值",
-  };
-  return labels[key] ?? key;
-}
-
-function getParamMin(key) {
-  if (key === "overbought" || key === "oversold") return 1;
-  return 2;
 }
 </script>

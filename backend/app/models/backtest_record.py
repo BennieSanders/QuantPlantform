@@ -8,6 +8,7 @@ class BacktestRecord(Base):
     __tablename__ = "backtest_records"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True, index=True)
+    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     strategy_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     strategy_name: Mapped[str] = mapped_column(String(80), nullable=False)
     asset_class: Mapped[str] = mapped_column(String(32), nullable=False)

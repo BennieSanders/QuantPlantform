@@ -2,14 +2,14 @@
 
 ## 1. Architecture Overview
 
-本项目采用“前后端分离 + 后端内置量化核心”的结构。第一版定位为虚拟货币现货回测平台，课程项目阶段不把量化核心拆成独立服务，避免过早引入服务治理、消息队列和部署复杂度。
+本项目采用“前后端分离 + 后端内置量化核心”的结构。当前阶段定位为工程化量化回测平台的早期版本：先保持虚拟货币现货回测闭环可运行，再逐步补齐认证、迁移、任务队列、策略沙箱和行情数据层。
 
 ```text
 User
 -> Frontend (Vue3 + Vite + ECharts)
 -> Backend (FastAPI)
 -> Quant Engine (Python package)
--> Database (MySQL)
+-> Database (SQLite local, MySQL/PostgreSQL production target)
 ```
 
 核心原则：
@@ -80,7 +80,8 @@ quant-platform/
 - FastAPI
 - Pydantic
 - SQLAlchemy
-- MySQL driver, such as PyMySQL or mysqlclient
+- Alembic
+- MySQL/PostgreSQL driver for production deployment
 
 模块职责：
 
@@ -101,6 +102,8 @@ API 初版规划：
 - `GET /api/backtests`
 - `GET /api/backtests/{id}`
 - `GET /api/users/me`
+
+当前实现已引入用户注册、登录、签名 token 和 `/api/users/me`。策略和回测记录带 `user_id`。开发环境仍允许无 token 回退到默认用户，生产环境必须关闭该兼容开关。
 
 第一版 `POST /api/backtests` 请求示例：
 
@@ -190,7 +193,7 @@ API 初版规划：
 - `close`
 - `volume`
 
-课程项目初期可以先用 CSV 演示 K 线数据，数据库表设计保留为后续扩展。后续如果扩展美股，可以继续复用 `asset_class` 和 `symbol` 字段，例如 `asset_class=us_stock`、`symbol=AAPL`。
+当前本地开发可以先用 CSV 演示 K 线数据，数据库表设计保留为后续扩展。后续如果扩展美股，可以继续复用 `asset_class` 和 `symbol` 字段，例如 `asset_class=us_stock`、`symbol=AAPL`。
 
 合约双向回测不进入第一版。后续扩展时可以复用同一套请求结构，把 `market_type` 从 `spot` 扩展为 `futures`，把 `position_mode` 从 `long_only` 扩展为 `long_short`，再增加杠杆、保证金、资金费率和强平相关字段。
 
@@ -232,7 +235,7 @@ def generate_signals(klines, params):
 4. Backend service calls quant_engine.
 5. quant_engine loads crypto K-line data and runs the selected strategy.
 6. analyzer calculates metrics and equity curve.
-7. Backend saves backtest record into MySQL.
+7. Backend saves backtest record into the configured database.
 8. Backend returns result to frontend.
 9. Frontend renders charts and summary metrics.
 ```
@@ -248,9 +251,11 @@ def generate_signals(klines, params):
 
 ### Milestone 2: Persistence
 
-- SQLite stores strategies and backtest records for the course demo.
+- SQLite stores strategies and backtest records for local development.
 - Backtest history is queryable through API and visible on Dashboard/History views.
-- Later replace SQLite with MySQL and add users/authentication.
+- Alembic owns schema evolution.
+- Strategy and backtest records carry `user_id` ownership.
+- Later replace the development default user with real authentication.
 
 ### Milestone 3: Strategy Expansion
 
@@ -262,11 +267,11 @@ def generate_signals(klines, params):
 
 ### Milestone 4: AI Extension
 
-- Add strategy recommendation entry.
-- Generate explanation or parameter suggestions from historical backtest results.
+- Add strategy analysis entry. Current frontend includes an AI analysis view.
+- Generate explanation, risk warnings, and parameter suggestions from historical backtest results. Current local provider is implemented and persisted.
+- Next: add an external model provider and evaluate suggestions against out-of-sample backtests.
 
 ### Milestone 5: Market Expansion
 
-- Add crypto futures long/short backtest as an advanced feature.
-- Add optional US stock symbols.
-- Keep crypto as the primary market in UI and documentation.
+- Current product scope remains crypto spot. Futures long/short and US stocks are intentionally deferred.
+- Real-time crypto K-line ingestion, storage, and observation are the active market-data priority.

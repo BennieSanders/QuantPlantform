@@ -6,6 +6,8 @@ Current files:
 
 - `BTCUSDT_1d.csv`: Binance spot BTCUSDT daily klines for 2024
 - `ETHUSDT_1d.csv`: Binance spot ETHUSDT daily klines for 2024
+- `BTCUSDT_1h.csv`: optional hourly history when you regenerate with `--interval 1h`
+- `ETHUSDT_1h.csv`: optional hourly history when you regenerate with `--interval 1h`
 
 CSV format:
 
@@ -21,6 +23,7 @@ Source:
 Regenerate data:
 
 ```bash
-python3 scripts/download_binance_klines.py --symbol BTCUSDT --interval 1d --start 2024-01 --end 2024-12
-python3 scripts/download_binance_klines.py --symbol ETHUSDT --interval 1d --start 2024-01 --end 2024-12
+python3 scripts/download_binance_klines.py --symbols BTCUSDT ETHUSDT --intervals 1d 1h --years-back 3
 ```
+
+The script writes one normalized CSV per symbol and interval, for example `BTCUSDT_1d.csv` and `BTCUSDT_1h.csv`.

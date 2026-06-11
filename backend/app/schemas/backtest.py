@@ -48,6 +48,15 @@ class EquityPoint(BaseModel):
     equity: float
 
 
+class MarketCandle(BaseModel):
+    date: str
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: float
+
+
 class BacktestMetrics(BaseModel):
     total_return: float
     annualized_return: float
@@ -68,6 +77,7 @@ class TradeRecord(BaseModel):
 
 class BacktestResponse(BaseModel):
     backtest_id: str
+    user_id: str
     asset_class: str
     market_type: str
     symbol: str
@@ -75,12 +85,14 @@ class BacktestResponse(BaseModel):
     position_mode: str
     strategy: str
     metrics: BacktestMetrics
+    market_klines: list[MarketCandle]
     equity_curve: list[EquityPoint]
     trades: list[TradeRecord]
 
 
 class BacktestRecordSummary(BaseModel):
     id: str
+    user_id: str
     symbol: str
     timeframe: str
     strategy_id: str
@@ -90,3 +102,21 @@ class BacktestRecordSummary(BaseModel):
     initial_cash: float
     metrics: BacktestMetrics
     created_at: str
+
+
+BacktestJobStatus = Literal["queued", "running", "succeeded", "failed", "cancelled"]
+
+
+class BacktestJobResponse(BaseModel):
+    id: str
+    user_id: str
+    status: BacktestJobStatus
+    request_payload: dict
+    result_backtest_id: str | None = None
+    retry_of_job_id: str | None = None
+    attempt: int = 1
+    cancel_requested: bool = False
+    error_message: str = ""
+    created_at: str
+    started_at: str | None = None
+    finished_at: str | None = None

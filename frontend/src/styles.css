@@ -38,6 +38,27 @@ button {
   background: #111827;
 }
 
+.account-box {
+  margin-top: auto;
+  border-top: 1px solid #334155;
+  padding: 14px 8px 0;
+}
+
+.account-box span {
+  display: block;
+  overflow: hidden;
+  color: #cbd5e1;
+  font-size: 13px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-link {
+  margin-top: 6px;
+  color: #5eead4;
+}
+
 .brand {
   display: flex;
   align-items: center;
@@ -115,6 +136,12 @@ button {
   margin-bottom: 20px;
 }
 
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .eyebrow {
   margin: 0 0 7px;
   color: #0f766e;
@@ -148,6 +175,27 @@ h1 {
 .view-stack {
   display: grid;
   gap: 18px;
+}
+
+.account-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+  gap: 18px;
+}
+
+.account-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.account-summary .metric strong {
+  overflow-wrap: anywhere;
+  font-size: 18px;
+}
+
+.auth-card {
+  align-self: start;
 }
 
 .workspace {
@@ -204,6 +252,73 @@ label {
   color: #64748b;
   font-size: 12px;
   font-weight: 700;
+}
+
+.job-status {
+  display: grid;
+  gap: 4px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.job-status span,
+.job-status small {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.job-status strong {
+  color: #1e3a8a;
+  font-size: 15px;
+}
+
+.job-table {
+  max-height: calc(100vh - 180px);
+}
+
+.mono-id {
+  display: block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+}
+
+.job-table small {
+  display: block;
+  margin-top: 3px;
+  color: #64748b;
+}
+
+.job-badge {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.job-badge.queued,
+.job-badge.running {
+  color: #1d4ed8;
+  background: #dbeafe;
+}
+
+.job-badge.succeeded {
+  color: #047857;
+  background: #d1fae5;
+}
+
+.job-badge.failed,
+.job-badge.cancelled {
+  color: #b91c1c;
+  background: #fee2e2;
+}
+
+.row-actions {
+  display: flex;
+  gap: 10px;
 }
 
 input,
@@ -480,6 +595,125 @@ th {
   gap: 10px;
 }
 
+.form-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 14px;
+}
+
+.form-row label {
+  display: grid;
+  gap: 7px;
+  min-width: 140px;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.form-row .wide-field {
+  flex: 1;
+  min-width: 300px;
+}
+
+.inline-toggle {
+  display: flex !important;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  min-width: auto !important;
+  padding-bottom: 10px;
+}
+
+.inline-toggle input {
+  width: auto;
+}
+
+.market-toolbar,
+.ai-toolbar {
+  display: grid;
+  gap: 12px;
+}
+
+.metric-time {
+  font-size: 16px !important;
+}
+
+.ai-report {
+  display: grid;
+  gap: 18px;
+}
+
+.ai-summary {
+  margin: 0;
+  color: #334155;
+  font-size: 16px;
+  line-height: 1.8;
+}
+
+.ai-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.ai-grid article {
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 16px;
+  background: #f8fafc;
+}
+
+.ai-grid h3 {
+  margin: 0 0 10px;
+}
+
+.ai-grid ul {
+  margin: 0;
+  padding-left: 20px;
+  color: #475569;
+  line-height: 1.7;
+}
+
+.risk-badge {
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.risk-low { background: #dcfce7; color: #166534; }
+.risk-medium { background: #fef3c7; color: #92400e; }
+.risk-high { background: #fee2e2; color: #991b1b; }
+
+.param-list {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px 16px;
+  margin: 0;
+}
+
+.param-list dt { color: #64748b; }
+.param-list dd { margin: 0; font-weight: 800; }
+
+.analysis-history {
+  display: grid;
+  gap: 8px;
+}
+
+.analysis-history-item {
+  display: flex;
+  justify-content: space-between;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #334155;
+  text-align: left;
+}
+
+.analysis-history-item span {
+  color: #64748b;
+  font-size: 12px;
+}
+
 @media (max-width: 1080px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -492,6 +726,12 @@ th {
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
+  }
+
+  .account-box {
+    margin-top: 0;
+    border-top: 0;
+    padding: 0 8px;
   }
 
   .nav-list {
@@ -520,8 +760,19 @@ th {
     flex-direction: column;
   }
 
+  .topbar-actions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
   .summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .account-layout,
+  .account-summary,
+  .ai-grid {
+    grid-template-columns: 1fr;
   }
 }
 

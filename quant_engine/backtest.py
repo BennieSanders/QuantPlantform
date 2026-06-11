@@ -5,7 +5,7 @@ from pathlib import Path
 
 from quant_engine.analyzer import PerformanceMetrics
 from quant_engine.broker import BrokerResult, SimulatedSpotBroker
-from quant_engine.datafeed import build_sample_path, load_klines
+from quant_engine.datafeed import Kline, build_sample_path, load_klines
 from quant_engine.engine import BacktestEngine
 from quant_engine.strategies import (
     MovingAverageCrossStrategy,
@@ -21,6 +21,7 @@ class BacktestResult:
     strategy: str
     metrics: PerformanceMetrics
     signals: list[object]
+    klines: list[Kline]
     broker_result: BrokerResult
 
 
@@ -147,5 +148,6 @@ def _run_strategy_backtest(
         strategy=strategy_name,
         metrics=result.metrics,
         signals=signals,
+        klines=klines,
         broker_result=result.broker_result,
     )

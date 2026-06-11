@@ -6,6 +6,7 @@ from uuid import uuid4
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.models.strategy import Strategy
 from app.schemas.strategy import StrategyCreate, StrategyResponse, StrategyUpdate
 from quant_engine.strategies.script import compile_signal_function
@@ -48,6 +49,7 @@ BUILTIN_STRATEGIES = [
 
 
 def seed_builtin_strategies(db: Session) -> None:
+    settings = get_settings()
     now = _now()
     changed = False
     for item in BUILTIN_STRATEGIES:
@@ -56,6 +58,7 @@ def seed_builtin_strategies(db: Session) -> None:
             db.add(
                 Strategy(
                     id=item["id"],
+                    user_id=settings.system_user_id,
                     name=item["name"],
                     description=item["description"],
                     strategy_type="builtin",
@@ -72,23 +75,35 @@ def seed_builtin_strategies(db: Session) -> None:
         db.commit()
 
 
-def list_strategies(db: Session) -> list[StrategyResponse]:
-    strategies = db.scalars(select(Strategy).order_by(Strategy.created_at)).all()
+def list_strategies(db: Session, user_id: str) -> list[StrategyResponse]:
+    strategies = db.scalars(
+        select(Strategy)
+        .where((Strategy.strategy_type == "builtin") | (Strategy.user_id == user_id))
+        .order_by(Strategy.created_at)
+    ).all()
     return [_to_response(strategy) for strategy in strategies]
 
 
-def get_strategy(db: Session, strategy_id: str) -> StrategyResponse | None:
+def get_strategy(db: Session, strategy_id: str, user_id: str) -> StrategyResponse | None:
     strategy = db.get(Strategy, strategy_id)
     if strategy is None:
+        return None
+    if strategy.strategy_type != "builtin" and strategy.user_id != user_id:
         return None
     return _to_response(strategy)
 
 
-def create_strategy(db: Session, payload: StrategyCreate) -> StrategyResponse:
+def create_strategy(
+    db: Session,
+    payload: StrategyCreate,
+    user_id: str | None = None,
+) -> StrategyResponse:
     _validate_custom_strategy(payload.strategy_type, payload.code)
+    owner_id = user_id or get_settings().system_user_id
     now = _now()
     strategy = Strategy(
         id=f"st-{uuid4().hex[:8]}",
+        user_id=owner_id,
         created_at=now,
         updated_at=now,
         **payload.model_dump(),
@@ -103,9 +118,13 @@ def update_strategy(
     db: Session,
     strategy_id: str,
     payload: StrategyUpdate,
+    user_id: str | None = None,
 ) -> StrategyResponse | None:
     strategy = db.get(Strategy, strategy_id)
     if strategy is None:
+        return None
+    owner_id = user_id or get_settings().system_user_id
+    if strategy.strategy_type != "builtin" and strategy.user_id != owner_id:
         return None
 
     update_data = payload.model_dump(exclude_unset=True)
@@ -124,9 +143,12 @@ def update_strategy(
     return _to_response(strategy)
 
 
-def delete_strategy(db: Session, strategy_id: str) -> bool:
+def delete_strategy(db: Session, strategy_id: str, user_id: str | None = None) -> bool:
     strategy = db.get(Strategy, strategy_id)
     if strategy is None:
+        return False
+    owner_id = user_id or get_settings().system_user_id
+    if strategy.strategy_type != "builtin" and strategy.user_id != owner_id:
         return False
     if strategy.strategy_type == "builtin":
         raise ValueError("Built-in strategies cannot be deleted")
@@ -139,6 +161,7 @@ def delete_strategy(db: Session, strategy_id: str) -> bool:
 def _to_response(strategy: Strategy) -> StrategyResponse:
     return StrategyResponse(
         id=strategy.id,
+        user_id=strategy.user_id,
         name=strategy.name,
         description=strategy.description,
         strategy_type=strategy.strategy_type,

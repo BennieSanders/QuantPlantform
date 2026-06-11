@@ -12,9 +12,16 @@ sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(BACKEND_ROOT))
 
 
+def clear_app_modules() -> None:
+    for module_name in list(sys.modules):
+        if module_name == "app" or module_name.startswith("app."):
+            del sys.modules[module_name]
+
+
 class BacktestServiceTest(unittest.TestCase):
     def test_backtest_service_persists_and_returns_records(self) -> None:
         with TemporaryDirectory() as tmp_dir:
+            clear_app_modules()
             os.environ["QUANT_PLATFORM_DATABASE_URL"] = (
                 f"sqlite:///{Path(tmp_dir) / 'test.db'}"
             )

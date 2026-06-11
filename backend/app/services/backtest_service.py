@@ -1,4 +1,3 @@
-from pathlib import Path
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -6,6 +5,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.models.backtest_record import BacktestRecord
 from app.models.strategy import Strategy
 from app.schemas.backtest import (
@@ -13,18 +13,24 @@ from app.schemas.backtest import (
     BacktestRecordSummary,
     BacktestRequest,
     BacktestResponse,
+    MarketCandle,
     EquityPoint,
     TradeRecord,
 )
 from quant_engine.backtest import run_builtin_backtest, run_script_backtest
+from quant_engine.datafeed import load_klines
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
-SAMPLE_DATA_DIR = PROJECT_ROOT / "data" / "sample"
+SAMPLE_DATA_DIR = get_settings().sample_data_dir
 
 
-def run_backtest(request: BacktestRequest, db: Session) -> BacktestResponse:
-    strategy = _load_strategy(request, db)
+def run_backtest(
+    request: BacktestRequest,
+    db: Session,
+    user_id: str | None = None,
+) -> BacktestResponse:
+    owner_id = user_id or get_settings().system_user_id
+    strategy = _load_strategy(request, db, owner_id)
     params = _merge_params(strategy, request)
 
     try:
@@ -58,6 +64,7 @@ def run_backtest(request: BacktestRequest, db: Session) -> BacktestResponse:
 
     response = BacktestResponse(
         backtest_id=f"bt-{uuid4().hex[:8]}",
+        user_id=owner_id,
         asset_class=request.asset_class,
         market_type=request.market_type,
         symbol=result.symbol,
@@ -73,6 +80,17 @@ def run_backtest(request: BacktestRequest, db: Session) -> BacktestResponse:
             win_rate=result.metrics.win_rate,
             final_equity=result.metrics.final_equity,
         ),
+        market_klines=[
+            MarketCandle(
+                date=kline.date.isoformat(),
+                open=kline.open,
+                high=kline.high,
+                low=kline.low,
+                close=kline.close,
+                volume=kline.volume,
+            )
+            for kline in result.klines
+        ],
         equity_curve=[
             EquityPoint(date=point.date.isoformat(), equity=point.equity)
             for point in result.broker_result.equity_curve
@@ -94,29 +112,47 @@ def run_backtest(request: BacktestRequest, db: Session) -> BacktestResponse:
         response=response,
         strategy=strategy,
         params=params,
+        user_id=owner_id,
     )
     return response
 
 
-def list_backtest_records(db: Session, limit: int = 20) -> list[BacktestRecordSummary]:
+def list_backtest_records(
+    db: Session,
+    user_id: str | None = None,
+    limit: int = 20,
+) -> list[BacktestRecordSummary]:
+    owner_id = user_id or get_settings().system_user_id
     limit = min(max(limit, 1), 100)
     records = db.scalars(
-        select(BacktestRecord).order_by(BacktestRecord.created_at.desc()).limit(limit)
+        select(BacktestRecord)
+        .where(BacktestRecord.user_id == owner_id)
+        .order_by(BacktestRecord.created_at.desc())
+        .limit(limit)
     ).all()
     return [_record_to_summary(record) for record in records]
 
 
-def get_backtest_record(record_id: str, db: Session) -> BacktestResponse | None:
+def get_backtest_record(
+    record_id: str,
+    db: Session,
+    user_id: str | None = None,
+) -> BacktestResponse | None:
+    owner_id = user_id or get_settings().system_user_id
     record = db.get(BacktestRecord, record_id)
     if record is None:
+        return None
+    if record.user_id != owner_id:
         return None
     return _record_to_response(record)
 
 
-def _load_strategy(request: BacktestRequest, db: Session) -> Strategy:
+def _load_strategy(request: BacktestRequest, db: Session, user_id: str) -> Strategy:
     strategy_id = request.strategy_id or "ma-cross-default"
     strategy = db.get(Strategy, strategy_id)
     if strategy is None:
+        raise HTTPException(status_code=404, detail="Strategy not found")
+    if strategy.strategy_type != "builtin" and strategy.user_id != user_id:
         raise HTTPException(status_code=404, detail="Strategy not found")
     if strategy.status != "active":
         raise HTTPException(status_code=400, detail="Only active strategies can be backtested")
@@ -143,9 +179,11 @@ def _save_backtest_record(
     response: BacktestResponse,
     strategy: Strategy,
     params: dict,
+    user_id: str,
 ) -> None:
     record = BacktestRecord(
         id=response.backtest_id,
+        user_id=user_id,
         strategy_id=strategy.id,
         strategy_name=strategy.name,
         asset_class=request.asset_class,
@@ -169,6 +207,7 @@ def _save_backtest_record(
 def _record_to_summary(record: BacktestRecord) -> BacktestRecordSummary:
     return BacktestRecordSummary(
         id=record.id,
+        user_id=record.user_id,
         symbol=record.symbol,
         timeframe=record.timeframe,
         strategy_id=record.strategy_id,
@@ -182,8 +221,10 @@ def _record_to_summary(record: BacktestRecord) -> BacktestRecordSummary:
 
 
 def _record_to_response(record: BacktestRecord) -> BacktestResponse:
+    market_klines = _load_record_market_klines(record)
     return BacktestResponse(
         backtest_id=record.id,
+        user_id=record.user_id,
         asset_class=record.asset_class,
         market_type=record.market_type,
         symbol=record.symbol,
@@ -191,6 +232,31 @@ def _record_to_response(record: BacktestRecord) -> BacktestResponse:
         position_mode=record.position_mode,
         strategy=record.strategy_id,
         metrics=BacktestMetrics(**record.metrics),
+        market_klines=market_klines,
         equity_curve=[EquityPoint(**point) for point in record.equity_curve],
         trades=[TradeRecord(**trade) for trade in record.trades],
     )
+
+
+def _load_record_market_klines(record: BacktestRecord) -> list[MarketCandle]:
+    try:
+        path = SAMPLE_DATA_DIR / f"{record.symbol.upper()}_{record.timeframe}.csv"
+        klines = load_klines(
+            path,
+            start_date=record.start_date,
+            end_date=record.end_date,
+        )
+    except Exception:
+        return []
+
+    return [
+        MarketCandle(
+            date=kline.date.isoformat(),
+            open=kline.open,
+            high=kline.high,
+            low=kline.low,
+            close=kline.close,
+            volume=kline.volume,
+        )
+        for kline in klines
+    ]

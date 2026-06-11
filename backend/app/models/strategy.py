@@ -8,6 +8,7 @@ class Strategy(Base):
     __tablename__ = "strategies"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True, index=True)
+    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(80), nullable=False)
     description: Mapped[str] = mapped_column(Text, default="", nullable=False)
     strategy_type: Mapped[str] = mapped_column(String(32), nullable=False)

@@ -19,10 +19,26 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Download Binance spot kline CSV files into data/sample."
     )
-    parser.add_argument("--symbol", default="BTCUSDT")
-    parser.add_argument("--interval", default="1d")
-    parser.add_argument("--start", default="2024-01", help="Start month, YYYY-MM")
-    parser.add_argument("--end", default="2024-12", help="End month, YYYY-MM")
+    parser.add_argument("--symbol", help="Single symbol to download.")
+    parser.add_argument(
+        "--symbols",
+        nargs="+",
+        help="Symbols to download. Defaults to BTCUSDT ETHUSDT.",
+    )
+    parser.add_argument("--interval", help="Single interval to download.")
+    parser.add_argument(
+        "--intervals",
+        nargs="+",
+        help="Intervals to download. Defaults to 1d 1h.",
+    )
+    parser.add_argument("--start", help="Start month, YYYY-MM")
+    parser.add_argument("--end", help="End month, YYYY-MM")
+    parser.add_argument(
+        "--years-back",
+        type=int,
+        default=None,
+        help="Download from January of current year minus N through the current month.",
+    )
     parser.add_argument(
         "--output-dir",
         default="data/sample",
@@ -30,28 +46,58 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    symbol = args.symbol.upper()
-    months = list(iter_months(args.start, args.end))
+    symbols = normalize_list(args.symbols or ([args.symbol] if args.symbol else None), ["BTCUSDT", "ETHUSDT"])
+    intervals = normalize_list(args.intervals or ([args.interval] if args.interval else None), ["1d", "1h"])
+    start_month, end_month = resolve_month_range(args.start, args.end, args.years_back)
+    months = list(iter_months(start_month, end_month))
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    output_path = output_dir / f"{symbol}_{args.interval}.csv"
 
-    rows: list[list[str]] = []
-    for year_month in months:
-        rows.extend(download_month(symbol, args.interval, year_month))
+    total_rows = 0
+    for symbol in symbols:
+        for interval in intervals:
+            rows: list[list[str]] = []
+            for year_month in months:
+                rows.extend(download_month(symbol, interval, year_month))
 
-    if not rows:
-        print(f"No rows downloaded for {symbol} {args.interval}", file=sys.stderr)
-        return 1
+            if not rows:
+                print(f"No rows downloaded for {symbol} {interval}", file=sys.stderr)
+                continue
 
-    rows.sort(key=lambda row: row[0])
-    with output_path.open("w", newline="", encoding="utf-8") as file:
-        writer = csv.writer(file)
-        writer.writerow(CSV_HEADER)
-        writer.writerows(rows)
+            rows.sort(key=lambda row: row[0])
+            output_path = output_dir / f"{symbol}_{interval}.csv"
+            with output_path.open("w", newline="", encoding="utf-8") as file:
+                writer = csv.writer(file)
+                writer.writerow(CSV_HEADER)
+                writer.writerows(rows)
 
-    print(f"Wrote {len(rows)} rows to {output_path}")
-    return 0
+            total_rows += len(rows)
+            print(f"Wrote {len(rows)} rows to {output_path}")
+
+    return 0 if total_rows else 1
+
+
+def normalize_list(values: list[str] | None, default: list[str]) -> list[str]:
+    if not values:
+        return default
+    return [value.upper() if value.endswith("USDT") else value for value in values]
+
+
+def resolve_month_range(
+    start: str | None,
+    end: str | None,
+    years_back: int | None,
+) -> tuple[str, str]:
+    if years_back is not None:
+        if years_back < 0:
+            raise SystemExit("--years-back must be non-negative")
+        current = datetime.now(UTC).date()
+        start_year = current.year - years_back
+        return f"{start_year:04d}-01", f"{current.year:04d}-{current.month:02d}"
+
+    if not start or not end:
+        raise SystemExit("Provide either --years-back or both --start and --end")
+    return start, end
 
 
 def iter_months(start: str, end: str):
