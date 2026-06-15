@@ -24,6 +24,14 @@ class Settings:
     allow_dev_auth_fallback: bool
     market_data_base_url: str
     market_data_timeout_seconds: float
+    openai_api_key: str | None
+    openai_model: str
+    openai_base_url: str
+    openai_timeout_seconds: float
+    gemini_api_key: str | None
+    gemini_model: str
+    gemini_base_url: str
+    gemini_timeout_seconds: float
 
     @property
     def is_sqlite(self) -> bool:
@@ -61,6 +69,16 @@ def get_settings() -> Settings:
         market_data_timeout_seconds=float(
             os.getenv("QUANT_PLATFORM_MARKET_DATA_TIMEOUT_SECONDS", "10")
         ),
+        openai_api_key=os.getenv("QUANT_PLATFORM_OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY"),
+        openai_model=os.getenv("QUANT_PLATFORM_OPENAI_MODEL", "gpt-5.5"),
+        openai_base_url=os.getenv("QUANT_PLATFORM_OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/"),
+        openai_timeout_seconds=float(os.getenv("QUANT_PLATFORM_OPENAI_TIMEOUT_SECONDS", "30")),
+        gemini_api_key=os.getenv("QUANT_PLATFORM_GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY"),
+        gemini_model=os.getenv("QUANT_PLATFORM_GEMINI_MODEL", "gemini-3.5-flash"),
+        gemini_base_url=os.getenv(
+            "QUANT_PLATFORM_GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta"
+        ).rstrip("/"),
+        gemini_timeout_seconds=float(os.getenv("QUANT_PLATFORM_GEMINI_TIMEOUT_SECONDS", "30")),
     )
 
 

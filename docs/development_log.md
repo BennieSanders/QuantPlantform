@@ -1,5 +1,66 @@
 # Development Log
 
+## 2026-06-15 Google Gemini AI Recommendation
+
+- Added Google AI Studio Gemini API support using `generateContent` with JSON output.
+- Added a three-way provider switch: Gemini, OpenAI, and the local recommendation engine.
+- Made Gemini the default provider while preserving explicit fallback messages and local resilience.
+
+## 2026-06-15 OpenAI-backed AI Recommendation
+
+- Added OpenAI Responses API support for backtest recommendation analysis.
+- Kept the local recommender as a fallback when no API key is configured or
+  the OpenAI request fails.
+- Added an explicit AI analysis mode switch so the UI can choose OpenAI or the
+  local engine per request.
+- Added environment-driven OpenAI model, base URL, and timeout settings.
+- Expanded AI analysis output into a structured recommendation panel with
+  score, confidence, execution plan, and fit/avoid profiles.
+
+Verification:
+
+```text
+Ran 15 tests
+OK
+
+vite build
+built successfully
+```
+
+## 2026-06-15 AI Recommendation Upgrade
+
+- Expanded the backtest AI output from a basic review into a recommendation
+  layer with score, confidence, analysis type, readiness stage, fit profile,
+  avoid profile, and execution plan.
+- Upgraded the AI analysis UI so the recommendation result is shown as a
+  structured decision panel instead of a plain summary block.
+- Added SQLite schema compatibility and Alembic migration `0003_ai_recommendation_fields`
+  for the new persisted AI analysis fields.
+- Added test coverage for the recommendation fields and kept the full suite
+  green.
+
+Verification:
+
+```text
+Ran 15 tests
+OK
+
+vite build
+built successfully
+```
+
+## 2026-06-11 Realtime Chart and Recent Backtest Data
+
+- Replaced the single-day range for every chart interval with timeframe-aware
+  windows from one day of 1-minute candles through one year of daily candles.
+- Added MA7/MA25 overlays and a recent-candle default zoom to the market chart.
+- Added recent backtest data synchronization and a market-data range API.
+- Backtests now prefer persisted market data when it fully covers the requested
+  range, with deterministic CSV fallback for offline historical examples.
+- Added test coverage proving 2026 database candles can drive a backtest.
+
+Verification: 13 backend tests pass and the frontend production build succeeds.
+
 ## 2026-06-11 AI and Realtime Market Data
 
 Implemented:

@@ -35,9 +35,11 @@ def run_ma_cross_backtest(
     long_window: int = 30,
     fee_rate: float = 0.001,
     data_dir: str | Path = "data/sample",
+    klines: list[Kline] | None = None,
 ) -> BacktestResult:
-    path = build_sample_path(symbol, timeframe, data_dir)
-    klines = load_klines(path, start_date=start_date, end_date=end_date)
+    if klines is None:
+        path = build_sample_path(symbol, timeframe, data_dir)
+        klines = load_klines(path, start_date=start_date, end_date=end_date)
     return _run_strategy_backtest(
         symbol=symbol,
         timeframe=timeframe,
@@ -64,9 +66,11 @@ def run_script_backtest(
     fee_rate: float = 0.001,
     data_dir: str | Path = "data/sample",
     strategy_name: str = "custom_code",
+    klines: list[Kline] | None = None,
 ) -> BacktestResult:
-    path = build_sample_path(symbol, timeframe, data_dir)
-    klines = load_klines(path, start_date=start_date, end_date=end_date)
+    if klines is None:
+        path = build_sample_path(symbol, timeframe, data_dir)
+        klines = load_klines(path, start_date=start_date, end_date=end_date)
     strategy_params = dict(params)
     strategy_params["code"] = code
     return _run_strategy_backtest(
@@ -91,6 +95,7 @@ def run_builtin_backtest(
     params: dict,
     fee_rate: float = 0.001,
     data_dir: str | Path = "data/sample",
+    klines: list[Kline] | None = None,
 ) -> BacktestResult:
     if strategy_name == "ma_cross":
         return run_ma_cross_backtest(
@@ -103,10 +108,12 @@ def run_builtin_backtest(
             long_window=int(params.get("long_window", 30)),
             fee_rate=fee_rate,
             data_dir=data_dir,
+            klines=klines,
         )
     if strategy_name == "rsi_reversal":
-        path = build_sample_path(symbol, timeframe, data_dir)
-        klines = load_klines(path, start_date=start_date, end_date=end_date)
+        if klines is None:
+            path = build_sample_path(symbol, timeframe, data_dir)
+            klines = load_klines(path, start_date=start_date, end_date=end_date)
         return _run_strategy_backtest(
             symbol=symbol,
             timeframe=timeframe,

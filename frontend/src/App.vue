@@ -1,5 +1,20 @@
 <template>
-  <main class="app-shell">
+  <AccountView
+    v-if="!authToken || !currentUser"
+    standalone
+    :auth-token="authToken"
+    :current-user="currentUser"
+    :error="authError"
+    :form="authForm"
+    :loading="authLoading"
+    :message="authMessage"
+    :mode="authMode"
+    @submit-auth="submitAuth"
+    @toggle-mode="toggleAuthMode"
+    @update-form="updateAuthForm"
+  />
+
+  <main v-else class="app-shell">
     <aside class="sidebar">
       <div class="brand">
         <span class="brand-mark">Q</span>
@@ -89,6 +104,8 @@
       <BacktestView
         v-if="activeView === 'backtest'"
         :active-job="activeBacktestJob"
+        :data-range="backtestDataRange"
+        :data-syncing="backtestDataSyncing"
         :error="errorMessage"
         :form="form"
         :loading="loading"
@@ -126,10 +143,12 @@
         :backtests="recentBacktests"
         :error="aiError"
         :loading="aiLoading"
+        :mode="aiMode"
         :selected-backtest-id="aiBacktestId"
         @analyze="runAiAnalysis"
         @open-analysis="aiAnalysis = $event"
         @select-backtest="selectAiBacktest"
+        @update-mode="aiMode = $event"
       />
 
       <StrategyManagerView
@@ -174,6 +193,7 @@ import {
   getBacktestJob,
   getCurrentUser,
   getMarketKlines,
+  getMarketRange,
   getStoredToken,
   listBacktestAnalyses,
   listBacktestJobs,
@@ -284,11 +304,14 @@ const marketSyncing = ref(false);
 const marketAutoRefresh = ref(false);
 const marketMessage = ref("");
 const marketError = ref("");
+const backtestDataRange = ref(null);
+const backtestDataSyncing = ref(false);
 const aiBacktestId = ref("");
 const aiAnalysis = ref(null);
 const aiAnalyses = ref([]);
 const aiLoading = ref(false);
 const aiError = ref("");
+const aiMode = ref("gemini");
 const currentUser = ref(null);
 const authToken = ref(getStoredToken());
 const authMode = ref("login");
@@ -351,6 +374,7 @@ watch(activeView, async () => {
     marketAutoRefresh.value = false;
     stopMarketPolling();
   }
+  if (activeView.value === "backtest") await prepareBacktestData();
   if (activeView.value === "ai" && aiBacktestId.value) await refreshAiAnalyses();
   await nextTick();
   ensureCharts();
@@ -358,11 +382,14 @@ watch(activeView, async () => {
 });
 
 async function initializeApp() {
+  if (!authToken.value) {
+    currentUser.value = null;
+    authMode.value = "login";
+    return;
+  }
   try {
     currentUser.value = await getCurrentUser();
-    await refreshStrategies();
-    await refreshJobs();
-    await refreshBacktests();
+    await loadAuthenticatedData();
     if (recentBacktests.value.length > 0) {
       result.value = await getBacktest(recentBacktests.value[0].id);
       selectedHistoryId.value = result.value.backtest_id;
@@ -371,8 +398,12 @@ async function initializeApp() {
     activeView.value = "market";
     toggleMarketAutoRefresh(true);
   } catch (error) {
-    authError.value = error.message;
-    activeView.value = "account";
+    clearStoredToken();
+    authToken.value = "";
+    currentUser.value = null;
+    authError.value = error.message === "Authentication required"
+      ? "请先登录"
+      : `登录状态已失效：${error.message}`;
   }
 }
 
@@ -400,6 +431,7 @@ async function submitAuth() {
       });
       authMode.value = "login";
       authMessage.value = "注册成功，请登录";
+      authForm.password = "";
       return;
     }
 
@@ -412,10 +444,8 @@ async function submitAuth() {
     currentUser.value = loginResult.user;
     authForm.password = "";
     authMessage.value = "登录成功";
-    await refreshStrategies();
-    await refreshJobs();
-    await refreshBacktests();
-    activeView.value = "market";
+    await loadAuthenticatedData();
+    activeView.value = "dashboard";
     toggleMarketAutoRefresh(true);
   } catch (error) {
     authError.value = error.message;
@@ -444,7 +474,8 @@ async function logout() {
   marketAutoRefresh.value = false;
   aiAnalysis.value = null;
   aiAnalyses.value = [];
-  activeView.value = "account";
+  activeView.value = "dashboard";
+  authMode.value = "login";
   authMessage.value = "已退出";
   authError.value = "";
 }
@@ -453,6 +484,27 @@ async function refreshStrategies() {
   strategies.value = await listStrategies();
   if (!selectedStrategy.value && strategies.value.length > 0) {
     selectStrategy(strategies.value[0]);
+  }
+}
+
+async function loadAuthenticatedData() {
+  const loaders = [
+    ["策略", refreshStrategies],
+    ["任务", refreshJobs],
+    ["回测历史", refreshBacktests],
+  ];
+
+  const failures = [];
+  for (const [label, loader] of loaders) {
+    try {
+      await loader();
+    } catch (error) {
+      failures.push(`${label}：${error.message}`);
+    }
+  }
+
+  if (failures.length > 0) {
+    authMessage.value = `已登录，但部分数据加载失败：${failures.join("；")}`;
   }
 }
 
@@ -564,7 +616,7 @@ async function refreshMarketSeries() {
       marketSymbol.value,
       marketTimeframe.value,
       2000,
-      "today_shanghai",
+      "chart_window",
     );
     await nextTick();
     ensureCharts();
@@ -584,7 +636,7 @@ async function syncMarketData() {
       symbol: marketSymbol.value,
       timeframe: marketTimeframe.value,
       limit: 2000,
-      range: "today_shanghai",
+      range: "chart_window",
     });
     marketMessage.value = `同步完成：新增 ${syncResult.inserted}，更新 ${syncResult.updated}`;
     await refreshMarketSeries();
@@ -597,12 +649,35 @@ async function syncMarketData() {
 
 function updateMarketSymbol(value) {
   marketSymbol.value = value;
-  refreshMarketSeries();
+  syncMarketData();
 }
 
 function updateMarketTimeframe(value) {
   marketTimeframe.value = value;
-  refreshMarketSeries();
+  syncMarketData();
+}
+
+async function prepareBacktestData() {
+  if (backtestDataSyncing.value) return;
+  backtestDataSyncing.value = true;
+  errorMessage.value = "";
+  try {
+    await syncMarketKlines({
+      symbol: form.symbol,
+      timeframe: form.timeframe,
+      limit: 2000,
+      range: "backtest_window",
+    });
+    backtestDataRange.value = await getMarketRange(form.symbol, form.timeframe);
+    if (backtestDataRange.value.start_date) {
+      form.startDate = backtestDataRange.value.start_date;
+      form.endDate = backtestDataRange.value.end_date;
+    }
+  } catch (error) {
+    errorMessage.value = `近期行情同步失败，将尝试本地 CSV：${error.message}`;
+  } finally {
+    backtestDataSyncing.value = false;
+  }
 }
 
 function toggleMarketAutoRefresh(enabled) {
@@ -648,7 +723,7 @@ async function runAiAnalysis() {
   aiLoading.value = true;
   aiError.value = "";
   try {
-    aiAnalysis.value = await analyzeBacktest(aiBacktestId.value);
+    aiAnalysis.value = await analyzeBacktest(aiBacktestId.value, aiMode.value);
     await refreshAiAnalyses();
   } catch (error) {
     aiError.value = error.message;
@@ -722,6 +797,8 @@ function selectStrategyById(strategyId) {
 }
 
 function updateBacktestForm(nextForm) {
+  const dataSelectionChanged =
+    form.symbol !== nextForm.symbol || form.timeframe !== nextForm.timeframe;
   form.symbol = nextForm.symbol;
   form.strategyId = nextForm.strategyId;
   form.timeframe = nextForm.timeframe;
@@ -729,6 +806,10 @@ function updateBacktestForm(nextForm) {
   form.endDate = nextForm.endDate;
   form.initialCash = nextForm.initialCash;
   form.params = { ...nextForm.params };
+  if (dataSelectionChanged) {
+    backtestDataRange.value = null;
+    prepareBacktestData();
+  }
 }
 
 function updateStrategyDraft(nextDraft) {

@@ -12,7 +12,9 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.models.market_kline import MarketKline
 from app.schemas.market import (
+    MarketDataHealthResponse,
     MarketKlineResponse,
+    MarketRangeResponse,
     MarketSeriesResponse,
     MarketSyncRequest,
     MarketSyncResponse,
@@ -30,7 +32,7 @@ def sync_market_klines(
     if fetcher:
         rows = fetcher(payload.symbol, payload.timeframe, payload.limit)
     else:
-        start_time = _shanghai_day_start_utc() if payload.range == "today_shanghai" else None
+        start_time = _range_start_utc(payload.range, payload.timeframe)
         rows = fetch_binance_klines(
             payload.symbol,
             payload.timeframe,
@@ -78,8 +80,9 @@ def get_market_series(
         MarketKline.symbol == symbol.upper(),
         MarketKline.timeframe == timeframe,
     )
-    if range_name == "today_shanghai":
-        query = query.where(MarketKline.open_time >= _shanghai_day_start_utc())
+    range_start = _range_start_utc(range_name, timeframe)
+    if range_start:
+        query = query.where(MarketKline.open_time >= range_start)
     rows = list(
         reversed(
             db.scalars(
@@ -92,6 +95,7 @@ def get_market_series(
     change_rate = None
     if last_price is not None and first_price:
         change_rate = round(last_price / first_price - 1, 6)
+    health = _build_market_health(rows, timeframe)
 
     return MarketSeriesResponse(
         symbol=symbol.upper(),
@@ -101,7 +105,26 @@ def get_market_series(
         change_rate=change_rate,
         last_open_time=rows[-1].open_time.isoformat() if rows else None,
         last_ingested_at=rows[-1].ingested_at.isoformat() if rows else None,
+        health=health,
         klines=[_to_response(row) for row in rows],
+    )
+
+
+def get_market_range(db: Session, symbol: str, timeframe: str) -> MarketRangeResponse:
+    rows = db.scalars(
+        select(MarketKline)
+        .where(
+            MarketKline.symbol == symbol.upper(),
+            MarketKline.timeframe == timeframe,
+        )
+        .order_by(MarketKline.open_time)
+    ).all()
+    return MarketRangeResponse(
+        symbol=symbol.upper(),
+        timeframe=timeframe,
+        start_date=rows[0].open_time.date().isoformat() if rows else None,
+        end_date=rows[-1].open_time.date().isoformat() if rows else None,
+        count=len(rows),
     )
 
 
@@ -156,6 +179,78 @@ def _shanghai_day_start_utc(now: datetime | None = None) -> datetime:
         tzinfo=UTC,
     )
     return shanghai_midnight_as_utc - timedelta(hours=8)
+
+
+def _range_start_utc(range_name: str, timeframe: str) -> datetime | None:
+    if range_name == "latest":
+        return None
+    day_start = _shanghai_day_start_utc()
+    if range_name == "today_shanghai":
+        return day_start
+    chart_days = {"1m": 1, "5m": 3, "15m": 7, "1h": 30, "1d": 365}
+    backtest_days = {"1h": 60, "1d": 730}
+    days = (backtest_days if range_name == "backtest_window" else chart_days).get(timeframe, 1)
+    return day_start - timedelta(days=days - 1)
+
+
+def _build_market_health(rows: list[MarketKline], timeframe: str) -> MarketDataHealthResponse:
+    expected_bar_seconds = _expected_bar_seconds(timeframe)
+    if not rows:
+        return MarketDataHealthResponse(
+            status="empty",
+            expected_bar_seconds=expected_bar_seconds,
+            age_minutes=None,
+            gap_count=0,
+            missing_bars=0,
+            latest_close_time=None,
+            latest_ingested_at=None,
+        )
+
+    gap_count = 0
+    missing_bars = 0
+    for previous, current in zip(rows, rows[1:]):
+        delta_seconds = (current.open_time - previous.open_time).total_seconds()
+        expected_gaps = int(round(delta_seconds / expected_bar_seconds)) - 1
+        if expected_gaps > 0:
+            gap_count += 1
+            missing_bars += expected_gaps
+
+    now = datetime.now(UTC)
+    latest_close_time = _as_utc(rows[-1].close_time)
+    age_minutes = round((now - latest_close_time).total_seconds() / 60, 1)
+    if age_minutes < 0:
+        age_minutes = 0.0
+
+    if gap_count == 0 and age_minutes <= max(expected_bar_seconds / 60 * 2, 5):
+        status = "fresh"
+    elif gap_count <= 1 and age_minutes <= max(expected_bar_seconds / 60 * 6, 15):
+        status = "watch"
+    else:
+        status = "stale"
+
+    return MarketDataHealthResponse(
+        status=status,
+        expected_bar_seconds=expected_bar_seconds,
+        age_minutes=age_minutes,
+        gap_count=gap_count,
+        missing_bars=missing_bars,
+        latest_close_time=latest_close_time.isoformat(),
+        latest_ingested_at=_as_utc(rows[-1].ingested_at).isoformat(),
+    )
+
+
+def _expected_bar_seconds(timeframe: str) -> int:
+    return {
+        "1m": 60,
+        "5m": 5 * 60,
+        "15m": 15 * 60,
+        "1h": 60 * 60,
+        "1d": 24 * 60 * 60,
+    }.get(timeframe, 60)
+
+
+def _as_utc(value: datetime) -> datetime:
+    return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
 
 
 def _parse_binance_row(symbol: str, timeframe: str, row: list, now: datetime) -> dict:

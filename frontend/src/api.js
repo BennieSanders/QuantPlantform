@@ -123,10 +123,19 @@ export async function syncMarketKlines(payload) {
   return parseResponse(response);
 }
 
-export async function analyzeBacktest(id) {
+export async function getMarketRange(symbol, timeframe) {
+  const query = new URLSearchParams({ symbol, timeframe });
+  const response = await fetch(`${API_BASE_URL}/api/market/range?${query}`, {
+    headers: authHeaders(),
+  });
+  return parseResponse(response);
+}
+
+export async function analyzeBacktest(id, mode = "gemini") {
   const response = await fetch(`${API_BASE_URL}/api/ai/backtests/${id}/analyze`, {
     method: "POST",
-    headers: authHeaders(),
+    headers: jsonHeaders(),
+    body: JSON.stringify({ mode }),
   });
   return parseResponse(response);
 }

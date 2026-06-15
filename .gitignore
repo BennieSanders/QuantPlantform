@@ -24,6 +24,8 @@ dist/
 
 data/raw/
 data/local/
+.run/
+outputs/
 
 # Local/sensitive datafeed config. Keep sample CSV files versioned.
 quant_engine/datafeed/mode: rule.yaml

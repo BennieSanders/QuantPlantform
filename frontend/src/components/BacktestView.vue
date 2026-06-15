@@ -37,7 +37,15 @@
           <input :value="form.endDate" type="date" @input="updateForm('endDate', $event.target.value)" />
         </label>
 
-        <p class="field-hint">示例 CSV 默认覆盖 2024 年日线；回填后可切换到 1h 数据。</p>
+        <p class="field-hint">切换标的或周期会同步近期行情；日期范围可在已入库数据内调整。</p>
+
+        <div class="data-range-box">
+          <span>可用行情</span>
+          <strong v-if="dataRange?.start_date">
+            {{ dataRange.start_date }} 至 {{ dataRange.end_date }} · {{ dataRange.count }} 根
+          </strong>
+          <strong v-else>{{ dataSyncing ? "正在同步近期行情..." : "暂无数据库行情，将尝试 CSV" }}</strong>
+        </div>
 
         <label>
           初始资金
@@ -123,6 +131,14 @@ const props = defineProps({
   error: {
     type: String,
     default: "",
+  },
+  dataRange: {
+    type: Object,
+    default: null,
+  },
+  dataSyncing: {
+    type: Boolean,
+    default: false,
   },
   form: {
     type: Object,

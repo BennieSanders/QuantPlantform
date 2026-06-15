@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from math import sqrt
-from statistics import mean, stdev
+from statistics import mean, median, stdev
 
 from quant_engine.models import EquityPoint, Trade
 
@@ -61,7 +61,8 @@ def _calculate_max_drawdown(equity_curve: list[EquityPoint]) -> float:
 def _calculate_annualized_return(equity_curve: list[EquityPoint], total_return: float) -> float:
     start_date = equity_curve[0].date
     end_date = equity_curve[-1].date
-    days = (end_date - start_date).days
+    elapsed = end_date - start_date
+    days = elapsed.total_seconds() / 86400
     if days <= 0:
         return total_return
 
@@ -86,7 +87,19 @@ def _calculate_sharpe_ratio(equity_curve: list[EquityPoint]) -> float:
     if volatility == 0:
         return 0.0
 
-    return mean(returns) / volatility * sqrt(365)
+    return mean(returns) / volatility * sqrt(_periods_per_year(equity_curve))
+
+
+def _periods_per_year(equity_curve: list[EquityPoint]) -> float:
+    intervals = []
+    for previous, current in zip(equity_curve, equity_curve[1:]):
+        seconds = (current.date - previous.date).total_seconds()
+        if seconds > 0:
+            intervals.append(seconds)
+    if not intervals:
+        return 365
+    seconds_per_year = 365 * 24 * 60 * 60
+    return max(1, seconds_per_year / median(intervals))
 
 
 def _calculate_win_rate(trades: list[Trade]) -> float:

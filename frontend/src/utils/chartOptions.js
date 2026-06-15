@@ -66,7 +66,11 @@ export function buildMarketChartOption(source) {
     point.high,
   ]);
   const volumes = source.market_klines.map((point) => point.volume);
+  const closes = source.market_klines.map((point) => point.close);
+  const ma7 = calculateMovingAverage(closes, 7);
+  const ma25 = calculateMovingAverage(closes, 25);
   const tradeMarks = buildTradeMarks(source.trades ?? [], dates);
+  const zoomStart = dates.length > 120 ? Math.max(0, ((dates.length - 120) / dates.length) * 100) : 0;
 
   return {
     animation: false,
@@ -74,7 +78,7 @@ export function buildMarketChartOption(source) {
       top: 0,
       left: 12,
       textStyle: { color: "#475569" },
-      data: ["K线", "成交量"],
+      data: ["K线", "MA7", "MA25", "成交量"],
     },
     tooltip: {
       trigger: "axis",
@@ -142,7 +146,7 @@ export function buildMarketChartOption(source) {
       {
         type: "inside",
         xAxisIndex: [0, 1],
-        start: 55,
+        start: zoomStart,
         end: 100,
       },
       {
@@ -150,7 +154,7 @@ export function buildMarketChartOption(source) {
         xAxisIndex: [0, 1],
         type: "slider",
         top: "95%",
-        start: 55,
+        start: zoomStart,
         end: 100,
       },
     ],
@@ -176,6 +180,22 @@ export function buildMarketChartOption(source) {
         },
       },
       {
+        name: "MA7",
+        type: "line",
+        data: ma7,
+        smooth: true,
+        showSymbol: false,
+        lineStyle: { width: 1.5, color: "#2563eb" },
+      },
+      {
+        name: "MA25",
+        type: "line",
+        data: ma25,
+        smooth: true,
+        showSymbol: false,
+        lineStyle: { width: 1.5, color: "#f59e0b" },
+      },
+      {
         name: "成交量",
         type: "bar",
         xAxisIndex: 1,
@@ -187,6 +207,14 @@ export function buildMarketChartOption(source) {
       },
     ],
   };
+}
+
+function calculateMovingAverage(values, window) {
+  return values.map((_, index) => {
+    if (index < window - 1) return "-";
+    const slice = values.slice(index - window + 1, index + 1);
+    return Number((slice.reduce((sum, value) => sum + value, 0) / window).toFixed(4));
+  });
 }
 
 function buildTradeMarks(trades, dates) {

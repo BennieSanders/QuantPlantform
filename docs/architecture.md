@@ -2,7 +2,7 @@
 
 ## 1. Architecture Overview
 
-本项目采用“前后端分离 + 后端内置量化核心”的结构。当前阶段定位为工程化量化回测平台的早期版本：先保持虚拟货币现货回测闭环可运行，再逐步补齐认证、迁移、任务队列、策略沙箱和行情数据层。
+本项目采用“前后端分离 + 后端内置量化核心”的结构。当前课程结项版本已经形成用户认证、实时行情、策略回测、任务管理和大模型分析闭环；策略沙箱和独立任务队列保留为后续工程化方向。
 
 ```text
 User
@@ -10,6 +10,7 @@ User
 -> Backend (FastAPI)
 -> Quant Engine (Python package)
 -> Database (SQLite local, MySQL/PostgreSQL production target)
+-> External Providers (Binance REST, Google Gemini, optional OpenAI)
 ```
 
 核心原则：
@@ -26,7 +27,7 @@ User
 - Symbols: BTCUSDT, ETHUSDT
 - Timeframes: 1d first, then 1h
 - Position mode: long_only
-- Data source: CSV sample data
+- Data source: Binance REST + SQLite storage, with CSV fallback
 
 ## 2. Project Structure
 
@@ -103,7 +104,7 @@ API 初版规划：
 - `GET /api/backtests/{id}`
 - `GET /api/users/me`
 
-当前实现已引入用户注册、登录、签名 token 和 `/api/users/me`。策略和回测记录带 `user_id`。开发环境仍允许无 token 回退到默认用户，生产环境必须关闭该兼容开关。
+当前实现已引入用户注册、登录、签名 token 和 `/api/users/me`。策略、回测记录和 AI 分析带 `user_id`。结项演示启动默认关闭无 token 回退。
 
 第一版 `POST /api/backtests` 请求示例：
 
@@ -136,7 +137,7 @@ API 初版规划：
 - `broker/`: 虚拟货币现货撮合、现金、持仓、手续费和交易记录。
 - `analyzer/`: 收益率、最大回撤、胜率、夏普比率等指标计算。
 
-当前已实现均线交叉和 RSI 反转两个基础策略，并使用 CSV 数据源跑通 BTCUSDT 日线回测闭环。
+当前已实现均线交叉和 RSI 反转两个基础策略。回测优先使用数据库中已同步的近期行情，覆盖不足时回退到 CSV 样例数据，兼顾实时性与离线可复现性。
 
 ## 6. Database
 
@@ -180,20 +181,21 @@ API 初版规划：
 - `trades`
 - `created_at`
 
-### kline_data
+### market_klines
 
 - `id`
 - `asset_class`
 - `symbol`
 - `timeframe`
-- `trade_date`
+- `open_time`
+- `close_time`
 - `open`
 - `high`
 - `low`
 - `close`
 - `volume`
 
-当前本地开发可以先用 CSV 演示 K 线数据，数据库表设计保留为后续扩展。后续如果扩展美股，可以继续复用 `asset_class` 和 `symbol` 字段，例如 `asset_class=us_stock`、`symbol=AAPL`。
+当前 Binance K 线已通过增量同步写入 SQLite，并带有断档、缺失数量和新鲜度检查。CSV 保留为历史回测和断网演示的确定性回退数据源。
 
 合约双向回测不进入第一版。后续扩展时可以复用同一套请求结构，把 `market_type` 从 `spot` 扩展为 `futures`，把 `position_mode` 从 `long_only` 扩展为 `long_short`，再增加杠杆、保证金、资金费率和强平相关字段。
 
@@ -267,9 +269,10 @@ def generate_signals(klines, params):
 
 ### Milestone 4: AI Extension
 
-- Add strategy analysis entry. Current frontend includes an AI analysis view.
-- Generate explanation, risk warnings, and parameter suggestions from historical backtest results. Current local provider is implemented and persisted.
-- Next: add an external model provider and evaluate suggestions against out-of-sample backtests.
+- AI analysis entry and persisted analysis history. Done.
+- Structured risk, strengths, warnings, execution plan, and parameter suggestions. Done.
+- Google Gemini API integration with explicit OpenAI and local-engine switching. Done.
+- Next: evaluate suggested parameters through automated out-of-sample candidate backtests.
 
 ### Milestone 5: Market Expansion
 

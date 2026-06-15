@@ -8,12 +8,17 @@ from app.core.database import get_db
 from app.core.security import get_current_user_id
 from app.schemas.market import (
     MarketSeriesResponse,
+    MarketRangeResponse,
     MarketSymbol,
     MarketSyncRequest,
     MarketSyncResponse,
     MarketTimeframe,
 )
-from app.services.market_data_service import get_market_series, sync_market_klines
+from app.services.market_data_service import (
+    get_market_range,
+    get_market_series,
+    sync_market_klines,
+)
 
 
 router = APIRouter(prefix="/api/market", tags=["market"])
@@ -24,7 +29,7 @@ def list_market_klines(
     symbol: MarketSymbol = Query(default="BTCUSDT"),
     timeframe: MarketTimeframe = Query(default="1m"),
     limit: int = Query(default=200, ge=1, le=2000),
-    range: Literal["latest", "today_shanghai"] = Query(default="latest"),
+    range: Literal["latest", "today_shanghai", "chart_window", "backtest_window"] = Query(default="latest"),
     db: Session = Depends(get_db),
     _user_id: str = Depends(get_current_user_id),
 ) -> MarketSeriesResponse:
@@ -35,6 +40,16 @@ def list_market_klines(
         limit=limit,
         range_name=range,
     )
+
+
+@router.get("/range", response_model=MarketRangeResponse)
+def get_market_data_range(
+    symbol: MarketSymbol = Query(default="BTCUSDT"),
+    timeframe: MarketTimeframe = Query(default="1d"),
+    db: Session = Depends(get_db),
+    _user_id: str = Depends(get_current_user_id),
+) -> MarketRangeResponse:
+    return get_market_range(db, symbol=symbol, timeframe=timeframe)
 
 
 @router.post("/sync", response_model=MarketSyncResponse)

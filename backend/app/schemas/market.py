@@ -11,7 +11,25 @@ class MarketSyncRequest(BaseModel):
     symbol: MarketSymbol
     timeframe: MarketTimeframe = "1m"
     limit: int = Field(default=200, ge=1, le=2000)
-    range: Literal["latest", "today_shanghai"] = "latest"
+    range: Literal["latest", "today_shanghai", "chart_window", "backtest_window"] = "latest"
+
+
+class MarketRangeResponse(BaseModel):
+    symbol: str
+    timeframe: str
+    start_date: str | None
+    end_date: str | None
+    count: int
+
+
+class MarketDataHealthResponse(BaseModel):
+    status: Literal["empty", "fresh", "watch", "stale"]
+    expected_bar_seconds: int
+    age_minutes: float | None
+    gap_count: int
+    missing_bars: int
+    latest_close_time: str | None
+    latest_ingested_at: str | None
 
 
 class MarketKlineResponse(BaseModel):
@@ -35,6 +53,7 @@ class MarketSeriesResponse(BaseModel):
     change_rate: float | None
     last_open_time: str | None
     last_ingested_at: str | None
+    health: MarketDataHealthResponse
     klines: list[MarketKlineResponse]
 
 

@@ -1,13 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd "$(dirname "$0")/../backend"
-
-if [ ! -d ".venv" ]; then
-  python3 -m venv .venv
-fi
-
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT_DIR/backend"
 source .venv/bin/activate
+
 if [ -f ".env.local" ]; then
   set -a
   source .env.local
@@ -18,11 +15,10 @@ if [ -f ".env" ]; then
   source .env
   set +a
 fi
-export PYTHONPATH="$(pwd)/..:${PYTHONPATH:-}"
+
+export PYTHONPATH="$ROOT_DIR:${PYTHONPATH:-}"
 export NO_PROXY="127.0.0.1,localhost,::1,${NO_PROXY:-}"
 export no_proxy="127.0.0.1,localhost,::1,${no_proxy:-}"
 export QUANT_PLATFORM_ALLOW_DEV_AUTH_FALLBACK="${QUANT_PLATFORM_ALLOW_DEV_AUTH_FALLBACK:-false}"
-if ! python -c "import fastapi, sqlalchemy, uvicorn" >/dev/null 2>&1; then
-  pip install -r requirements.txt
-fi
-uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+
+exec uvicorn app.main:app --host 127.0.0.1 --port 8000

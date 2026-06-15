@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, time
 from uuid import uuid4
 
 from fastapi import HTTPException
@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.models.backtest_record import BacktestRecord
+from app.models.market_kline import MarketKline
 from app.models.strategy import Strategy
 from app.schemas.backtest import (
     BacktestMetrics,
@@ -18,7 +19,7 @@ from app.schemas.backtest import (
     TradeRecord,
 )
 from quant_engine.backtest import run_builtin_backtest, run_script_backtest
-from quant_engine.datafeed import load_klines
+from quant_engine.datafeed import Kline, load_klines
 
 
 SAMPLE_DATA_DIR = get_settings().sample_data_dir
@@ -32,6 +33,7 @@ def run_backtest(
     owner_id = user_id or get_settings().system_user_id
     strategy = _load_strategy(request, db, owner_id)
     params = _merge_params(strategy, request)
+    persisted_klines = _load_persisted_klines(request, db)
 
     try:
         if strategy.strategy_type == "builtin":
@@ -44,6 +46,7 @@ def run_backtest(
                 initial_cash=request.initial_cash,
                 params=params,
                 data_dir=SAMPLE_DATA_DIR,
+                klines=persisted_klines,
             )
         else:
             result = run_script_backtest(
@@ -56,6 +59,7 @@ def run_backtest(
                 params=params,
                 data_dir=SAMPLE_DATA_DIR,
                 strategy_name=strategy.id,
+                klines=persisted_klines,
             )
     except HTTPException:
         raise
@@ -144,7 +148,7 @@ def get_backtest_record(
         return None
     if record.user_id != owner_id:
         return None
-    return _record_to_response(record)
+    return _record_to_response(record, db)
 
 
 def _load_strategy(request: BacktestRequest, db: Session, user_id: str) -> Strategy:
@@ -157,6 +161,40 @@ def _load_strategy(request: BacktestRequest, db: Session, user_id: str) -> Strat
     if strategy.status != "active":
         raise HTTPException(status_code=400, detail="Only active strategies can be backtested")
     return strategy
+
+
+def _load_persisted_klines(request: BacktestRequest, db: Session) -> list[Kline] | None:
+    start = datetime.combine(date.fromisoformat(request.start_date), time.min, tzinfo=UTC)
+    end = datetime.combine(date.fromisoformat(request.end_date), time.max, tzinfo=UTC)
+    rows = db.scalars(
+        select(MarketKline)
+        .where(
+            MarketKline.symbol == request.symbol,
+            MarketKline.timeframe == request.timeframe,
+            MarketKline.open_time >= start,
+            MarketKline.open_time <= end,
+        )
+        .order_by(MarketKline.open_time)
+    ).all()
+    if not rows:
+        return None
+
+    first_date = rows[0].open_time.date()
+    last_date = rows[-1].open_time.date()
+    if first_date > date.fromisoformat(request.start_date) or last_date < date.fromisoformat(request.end_date):
+        return None
+
+    return [
+        Kline(
+            date=row.open_time if request.timeframe != "1d" else row.open_time.date(),
+            open=row.open,
+            high=row.high,
+            low=row.low,
+            close=row.close,
+            volume=row.volume,
+        )
+        for row in rows
+    ]
 
 
 def _merge_params(strategy: Strategy, request: BacktestRequest) -> dict:
@@ -220,8 +258,8 @@ def _record_to_summary(record: BacktestRecord) -> BacktestRecordSummary:
     )
 
 
-def _record_to_response(record: BacktestRecord) -> BacktestResponse:
-    market_klines = _load_record_market_klines(record)
+def _record_to_response(record: BacktestRecord, db: Session) -> BacktestResponse:
+    market_klines = _load_record_market_klines(record, db)
     return BacktestResponse(
         backtest_id=record.id,
         user_id=record.user_id,
@@ -238,7 +276,34 @@ def _record_to_response(record: BacktestRecord) -> BacktestResponse:
     )
 
 
-def _load_record_market_klines(record: BacktestRecord) -> list[MarketCandle]:
+def _load_record_market_klines(record: BacktestRecord, db: Session) -> list[MarketCandle]:
+    persisted = _load_persisted_klines(
+        BacktestRequest(
+            asset_class=record.asset_class,
+            market_type=record.market_type,
+            symbol=record.symbol,
+            timeframe=record.timeframe,
+            position_mode=record.position_mode,
+            strategy_id=record.strategy_id,
+            start_date=record.start_date,
+            end_date=record.end_date,
+            initial_cash=record.initial_cash,
+            params=record.params,
+        ),
+        db,
+    )
+    if persisted:
+        return [
+            MarketCandle(
+                date=kline.date.isoformat(),
+                open=kline.open,
+                high=kline.high,
+                low=kline.low,
+                close=kline.close,
+                volume=kline.volume,
+            )
+            for kline in persisted
+        ]
     try:
         path = SAMPLE_DATA_DIR / f"{record.symbol.upper()}_{record.timeframe}.csv"
         klines = load_klines(

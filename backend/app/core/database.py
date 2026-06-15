@@ -106,3 +106,34 @@ def _upgrade_sqlite_development_schema() -> None:
                         "ADD COLUMN error_message VARCHAR(1000) NOT NULL DEFAULT ''"
                     )
                 )
+
+        if "ai_analyses" in table_names:
+            columns = {column["name"] for column in inspector.get_columns("ai_analyses")}
+            if "analysis_type" not in columns:
+                connection.execute(
+                    text("ALTER TABLE ai_analyses ADD COLUMN analysis_type VARCHAR(32) NOT NULL DEFAULT ''")
+                )
+            if "readiness" not in columns:
+                connection.execute(
+                    text("ALTER TABLE ai_analyses ADD COLUMN readiness VARCHAR(32) NOT NULL DEFAULT ''")
+                )
+            if "score" not in columns:
+                connection.execute(
+                    text("ALTER TABLE ai_analyses ADD COLUMN score FLOAT NOT NULL DEFAULT 0")
+                )
+            if "confidence" not in columns:
+                connection.execute(
+                    text("ALTER TABLE ai_analyses ADD COLUMN confidence FLOAT NOT NULL DEFAULT 0")
+                )
+            if "fit_profile" not in columns:
+                connection.execute(
+                    text("ALTER TABLE ai_analyses ADD COLUMN fit_profile JSON NOT NULL DEFAULT '[]'")
+                )
+            if "avoid_profile" not in columns:
+                connection.execute(
+                    text("ALTER TABLE ai_analyses ADD COLUMN avoid_profile JSON NOT NULL DEFAULT '[]'")
+                )
+            if "execution_plan" not in columns:
+                connection.execute(
+                    text("ALTER TABLE ai_analyses ADD COLUMN execution_plan JSON NOT NULL DEFAULT '[]'")
+                )

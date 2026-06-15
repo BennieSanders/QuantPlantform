@@ -16,14 +16,14 @@ adding more trading features.
 
 ## E1: Platform Foundation
 
-Status: in progress.
+Status: course-demo complete; production hardening remains.
 
 - Centralize backend settings under `app.core.config`.
 - Replace hardcoded database and data paths with `QUANT_PLATFORM_*`
   environment variables.
 - Add Alembic baseline migration.
 - Add `users` table and `user_id` ownership columns.
-- Keep local development easy with a default development user.
+- Keep local development configurable while the demo runner requires authentication.
 - Expand tests from engine-only checks to include route-layer behavior.
 
 Exit criteria:
@@ -34,7 +34,7 @@ Exit criteria:
 
 ## E2: Authentication and Authorization
 
-Status: in progress.
+Status: course-demo complete.
 
 - Add password hashing and login endpoint.
 - Add JWT or server-side session authentication.
@@ -49,8 +49,7 @@ Current implementation:
 - Added HMAC-signed access tokens using standard library crypto primitives.
 - Added `/api/users/me`.
 - Added frontend account view, token persistence, and Authorization headers.
-- Development mode still supports default-user fallback; production should set
-  `QUANT_PLATFORM_ALLOW_DEV_AUTH_FALLBACK=false`.
+- The recommended demo runner sets `QUANT_PLATFORM_ALLOW_DEV_AUTH_FALLBACK=false`.
 
 ## E3: Async Backtest Jobs
 
@@ -103,7 +102,7 @@ Remaining work:
 - Generate strategy-specific parameter suggestions. Done for MA and RSI.
 - Add frontend analysis generation and history views. Done.
 - Keep a provider field and stable response contract. Done.
-- Add an external model provider with prompt/version tracking and evaluation fixtures.
+- Google Gemini and OpenAI provider integrations are implemented; prompt versioning and evaluation fixtures remain.
 - Add parameter candidate backtests and rank suggestions using out-of-sample results.
 
 ## E6: Production Readiness

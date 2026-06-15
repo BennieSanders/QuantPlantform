@@ -56,7 +56,7 @@ Frontend crypto backtest form
 - Timeframes: 1d first, then 1h
 - Direction: long only
 - Future extension: crypto futures long/short
-- Data source: CSV sample data
+- Data source: Binance REST + SQLite K-line storage, with CSV fallback
 - Built-in strategies: moving average crossover and RSI reversal
 
 ## 当前进度
@@ -65,7 +65,7 @@ Frontend crypto backtest form
 - 已新增统一配置层 `app.core.config`，支持环境变量驱动数据库、CORS 和样例数据目录。
 - 已新增 Alembic 迁移骨架，后续数据库 schema 演进不再依赖 `create_all()`。
 - 已新增 `users` 模型、注册/登录接口和签名访问 token；策略和回测记录已绑定 `user_id`。
-- 开发环境允许无 token 回退到默认用户；生产环境应关闭 `QUANT_PLATFORM_ALLOW_DEV_AUTH_FALLBACK`。
+- 演示启动默认关闭匿名回退，必须注册或登录后才能访问功能页面。
 - 已准备 Binance 公开数据源的 BTCUSDT、ETHUSDT 2024 年日线 CSV。
 - 已提供批量下载脚本，可回填 BTC/ETH 的 1d 和 1h 历史 K 线到 `data/sample/`。
 - `quant_engine.datafeed` 已支持读取本地 K 线 CSV。
@@ -83,9 +83,10 @@ Frontend crypto backtest form
 - 策略管理已支持从内置策略复制为自定义策略模板，再编辑和保存。
 - `tests/` 已覆盖 MA/RSI 内置策略稳定结果、自定义策略校验、回测记录持久化服务和路由层用户隔离。
 - 已新增 `market_klines` 持久化模型和 `/api/market/sync`、`/api/market/klines` 接口，可从 Binance 拉取 BTC/ETH 的 1m、5m、15m、1h、1d K 线并增量更新。
-- 前端已新增实时行情观察页，支持手动同步和每 10 秒自动拉取、入库、刷新行情图。
-- 已新增 AI 回测分析记录和 `/api/ai/backtests/{id}/analyze` 接口，输出风险等级、优势、警告、行动建议和建议参数，并保存分析历史。
-- 当前 AI 提供器为可离线复现的 `local-quant-analyst-v1`，后续可通过稳定响应契约替换为外部模型提供器。
+- 前端已新增实时行情观察页，支持手动同步和每 10 秒自动拉取、入库、刷新行情图；按周期自动使用合理窗口（1m/1天、5m/3天、15m/7天、1h/30天、1d/1年），并显示 MA7、MA25。
+- 回测服务会优先使用数据库中的近期行情，覆盖不足时再回退到样例 CSV；回测页面会同步并显示当前标的和周期的可用日期范围。
+- 已新增 AI 回测分析记录和 `/api/ai/backtests/{id}/analyze` 接口，输出风险等级、推荐评分、置信度、适配场景、风险提示、行动建议和建议参数，并保存分析历史。
+- AI 分析页支持 `Google Gemini` / `OpenAI` / `本地引擎` 切换；当前默认调用 Gemini API，如果没有配置密钥或调用失败，会回退到可离线复现的 `local-quant-recommender-v2`。
 
 ## 环境变量
 
@@ -101,6 +102,14 @@ export QUANT_PLATFORM_ACCESS_TOKEN_TTL_SECONDS=86400
 export QUANT_PLATFORM_ALLOW_DEV_AUTH_FALLBACK=true
 export QUANT_PLATFORM_MARKET_DATA_BASE_URL=https://api.binance.com
 export QUANT_PLATFORM_MARKET_DATA_TIMEOUT_SECONDS=10
+export QUANT_PLATFORM_OPENAI_API_KEY=sk-...
+export QUANT_PLATFORM_OPENAI_MODEL=gpt-5.5
+export QUANT_PLATFORM_OPENAI_BASE_URL=https://api.openai.com/v1
+export QUANT_PLATFORM_OPENAI_TIMEOUT_SECONDS=30
+export QUANT_PLATFORM_GEMINI_API_KEY=your-google-ai-studio-key
+export QUANT_PLATFORM_GEMINI_MODEL=gemini-3.5-flash
+export QUANT_PLATFORM_GEMINI_BASE_URL=https://generativelanguage.googleapis.com/v1beta
+export QUANT_PLATFORM_GEMINI_TIMEOUT_SECONDS=30
 ```
 
 实时行情接口：
@@ -116,7 +125,10 @@ curl "http://127.0.0.1:8000/api/market/klines?symbol=BTCUSDT&timeframe=1m&limit=
 AI 分析接口：
 
 ```bash
-curl -X POST http://127.0.0.1:8000/api/ai/backtests/<backtest_id>/analyze
+curl -X POST http://127.0.0.1:8000/api/ai/backtests/<backtest_id>/analyze \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <access_token>" \
+  -d '{"mode":"gemini"}'
 curl http://127.0.0.1:8000/api/ai/backtests/<backtest_id>/analyses
 ```
 
@@ -213,20 +225,31 @@ python3 scripts/download_binance_klines.py --symbols BTCUSDT ETHUSDT --intervals
 PYTHONPATH="$(pwd):$(pwd)/backend" backend/.venv/bin/python -m unittest discover -s tests -v
 ```
 
-启动后端：
+推荐的结项演示启动方式：
 
 ```bash
-./scripts/dev_backend.sh
+./scripts/demo.sh
 ```
 
-启动前端：
+该命令固定启动后端 `8000` 和前端 `5173`，保持终端运行，按 `Ctrl+C` 自动停止。另开终端可执行自检：
 
 ```bash
-./scripts/dev_frontend.sh
+./scripts/check_demo.sh
 ```
+
+后台启动和停止方式：
+
+```bash
+./scripts/start_demo.sh
+./scripts/stop_demo.sh
+```
+
+开发时仍可分别运行 `./scripts/dev_backend.sh` 和 `./scripts/dev_frontend.sh`。
 
 访问前端：
 
 ```text
 http://127.0.0.1:5173
 ```
+
+完整演示顺序、断网预案和检查清单见 `docs/demo_runbook.md`。

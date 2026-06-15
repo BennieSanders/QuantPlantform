@@ -1,9 +1,38 @@
 <template>
-  <section class="account-layout">
-    <section class="content-card">
+  <section :class="standalone ? 'auth-gateway' : 'account-layout'">
+    <div v-if="standalone" class="auth-ornament auth-ornament-one"></div>
+    <div v-if="standalone" class="auth-ornament auth-ornament-two"></div>
+    <div v-if="standalone" class="auth-backdrop"></div>
+    <section v-if="standalone" class="auth-intro">
+      <span class="auth-logo">Q</span>
+      <p class="eyebrow">Quant Research Platform</p>
+      <h1>量化研究，从可信数据开始</h1>
+      <p class="auth-lead">实时行情、策略回测、风险指标与 AI 分析集中在一个研究工作台。</p>
+      <div class="auth-chips" aria-label="平台能力">
+        <span>实时 K 线</span>
+        <span>回测中心</span>
+        <span>AI 分析</span>
+      </div>
+      <div class="auth-highlights">
+        <article>
+          <strong>实时</strong>
+          <span>行情接入与多周期观察</span>
+        </article>
+        <article>
+          <strong>工程化</strong>
+          <span>策略、任务、历史数据闭环</span>
+        </article>
+        <article>
+          <strong>智能化</strong>
+          <span>AI 风险解读与参数建议</span>
+        </article>
+      </div>
+    </section>
+
+    <section v-if="currentUser" class="content-card">
       <div class="section-heading">
         <h2>当前账户</h2>
-        <span>{{ authToken ? "Token 已保存" : "开发默认用户" }}</span>
+        <span>{{ authToken ? "已认证" : "未认证" }}</span>
       </div>
 
       <div class="account-summary">
@@ -22,9 +51,12 @@
       </div>
     </section>
 
-    <section class="content-card auth-card">
+    <section v-if="!currentUser" :class="['content-card', 'auth-card', { 'auth-card-standalone': standalone }]">
       <div class="section-heading">
-        <h2>{{ mode === "login" ? "登录" : "注册" }}</h2>
+        <div>
+          <p class="eyebrow">{{ mode === "login" ? "Welcome Back" : "Create Account" }}</p>
+          <h2>{{ mode === "login" ? "登录平台" : "注册账户" }}</h2>
+        </div>
         <button class="secondary-button" type="button" @click="$emit('toggle-mode')">
           {{ mode === "login" ? "切换注册" : "切换登录" }}
         </button>
@@ -53,6 +85,8 @@
         </button>
       </form>
 
+      <p class="auth-note">登录后才能访问行情、回测、策略和 AI 分析功能。</p>
+
       <p v-if="message" class="success-message">{{ message }}</p>
       <p v-if="error" class="error-message">{{ error }}</p>
     </section>
@@ -64,6 +98,10 @@ const props = defineProps({
   authToken: {
     type: String,
     default: "",
+  },
+  standalone: {
+    type: Boolean,
+    default: false,
   },
   currentUser: {
     type: Object,

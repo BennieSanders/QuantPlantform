@@ -32,7 +32,7 @@
           自动观察
         </label>
       </div>
-      <p class="field-hint">加密货币 24 小时交易。这里以北京时间 00:00 为当日开盘，展示从今日开始到现在的 K 线，并每 10 秒更新。</p>
+      <p class="field-hint">按周期自动加载合理观察窗口：1 分钟看 1 天、5 分钟看 3 天、15 分钟看 7 天、1 小时看 30 天、日线看 1 年。</p>
       <p v-if="message" class="success-message">{{ message }}</p>
       <p v-if="error" class="error-message">{{ error }}</p>
     </section>
@@ -43,18 +43,30 @@
         <strong>{{ formatMoney(series?.last_price) }}</strong>
       </article>
       <article class="metric">
-        <span>今日涨跌</span>
+        <span>窗口涨跌</span>
         <strong>{{ formatPercent(series?.change_rate) }}</strong>
       </article>
       <article class="metric">
-        <span>今日 K 线</span>
+        <span>窗口 K 线</span>
         <strong>{{ series?.count ?? 0 }}</strong>
       </article>
       <article class="metric">
         <span>最后入库</span>
         <strong class="metric-time">{{ formatDateTime(series?.last_ingested_at) }}</strong>
       </article>
+      <article class="metric">
+        <span>数据状态</span>
+        <strong :class="['metric-status', `metric-status-${series?.health?.status ?? 'empty'}`]">
+          {{ formatHealthStatus(series?.health?.status) }}
+        </strong>
+      </article>
     </div>
+
+    <p v-if="series?.health" class="field-hint market-health-hint">
+      预期周期 {{ formatDuration(series.health.expected_bar_seconds) }} ·
+      断档 {{ series.health.gap_count }} 段 / 缺失 {{ series.health.missing_bars }} 根 ·
+      数据年龄 {{ formatAge(series.health.age_minutes) }}
+    </p>
 
     <section class="content-card chart-card">
       <div class="section-heading">
@@ -89,6 +101,30 @@ const emit = defineEmits([
   "update-timeframe",
 ]);
 const chartRef = ref(null);
+
+function formatHealthStatus(status) {
+  const labels = {
+    empty: "无数据",
+    fresh: "正常",
+    watch: "关注",
+    stale: "过期",
+  };
+  return labels[status] ?? status ?? "-";
+}
+
+function formatDuration(seconds) {
+  if (!seconds) return "-";
+  if (seconds % 86400 === 0) return `${seconds / 86400} 天`;
+  if (seconds % 3600 === 0) return `${seconds / 3600} 小时`;
+  if (seconds % 60 === 0) return `${seconds / 60} 分钟`;
+  return `${seconds} 秒`;
+}
+
+function formatAge(minutes) {
+  if (minutes === undefined || minutes === null) return "-";
+  if (minutes < 60) return `${minutes.toFixed(1)} 分钟`;
+  return `${(minutes / 60).toFixed(1)} 小时`;
+}
 
 onMounted(() => emit("chart-ready", chartRef.value));
 </script>
