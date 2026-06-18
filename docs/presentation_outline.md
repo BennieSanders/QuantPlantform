@@ -2,6 +2,11 @@
 
 对应文件：`deliverables/quant_platform_defense_presentation_v3.pptx`
 
+相关文档：
+
+- 完整讲稿与问答预案：`docs/defense_speech_script.md`
+- 项目报告：`docs/project_report.md`
+
 建议总时长：8-10 分钟，其中 PPT 讲解约 6-7 分钟，现场演示约 2-3 分钟。
 
 ## 汇报结构
