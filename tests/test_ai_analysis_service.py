@@ -20,6 +20,16 @@ def clear_app_modules() -> None:
 
 
 class AiAnalysisServiceTest(unittest.TestCase):
+    def test_gemini_model_candidates_are_deduplicated(self) -> None:
+        from app.services.ai_analysis_service import _gemini_model_candidates
+
+        models = _gemini_model_candidates(
+            "gemini-2.5-flash",
+            ("gemini-3.1-flash-lite", "gemini-2.5-flash", ""),
+        )
+
+        self.assertEqual(models, ["gemini-2.5-flash", "gemini-3.1-flash-lite"])
+
     def test_analysis_mode_switch_uses_requested_provider(self) -> None:
         with TemporaryDirectory() as tmp_dir:
             clear_app_modules()

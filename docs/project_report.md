@@ -112,7 +112,7 @@
 - 适配场景与不建议场景。
 - 下一步执行计划和建议参数。
 
-默认 provider 为 Google Gemini，模型为 `gemini-3.5-flash`。系统同时保留 OpenAI Responses API 和本地规则引擎。外部 API 失败时会明确显示失败原因并回退本地分析，页面会保留实际 provider 信息。
+默认 provider 为 Google Gemini，主模型为 `gemini-2.5-flash`，并配置备用 Gemini 模型。系统同时保留 OpenAI Responses API 和本地规则引擎。外部 API 失败时会明确显示失败原因并回退本地分析，页面会保留实际 provider 信息。
 
 ## 5. 实际运行案例
 

@@ -31,6 +31,7 @@ class Settings:
     openai_timeout_seconds: float
     gemini_api_key: str | None
     gemini_model: str
+    gemini_fallback_models: tuple[str, ...]
     gemini_base_url: str
     gemini_timeout_seconds: float
 
@@ -82,7 +83,11 @@ def get_settings() -> Settings:
         openai_base_url=os.getenv("QUANT_PLATFORM_OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/"),
         openai_timeout_seconds=float(os.getenv("QUANT_PLATFORM_OPENAI_TIMEOUT_SECONDS", "30")),
         gemini_api_key=os.getenv("QUANT_PLATFORM_GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY"),
-        gemini_model=os.getenv("QUANT_PLATFORM_GEMINI_MODEL", "gemini-3.5-flash"),
+        gemini_model=os.getenv("QUANT_PLATFORM_GEMINI_MODEL", "gemini-2.5-flash"),
+        gemini_fallback_models=_split_csv(
+            os.getenv("QUANT_PLATFORM_GEMINI_FALLBACK_MODELS"),
+            ("gemini-3.1-flash-lite", "gemini-3.5-flash"),
+        ),
         gemini_base_url=os.getenv(
             "QUANT_PLATFORM_GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta"
         ).rstrip("/"),

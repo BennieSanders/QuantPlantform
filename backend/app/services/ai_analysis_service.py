@@ -347,24 +347,45 @@ def _build_gemini_analysis(record: BacktestRecord, settings) -> AnalysisDraft | 
         "x-goog-api-key": settings.gemini_api_key,
         "Content-Type": "application/json",
     }
-    path = f"/models/{settings.gemini_model}:generateContent"
     with httpx.Client(
         timeout=settings.gemini_timeout_seconds,
         base_url=settings.gemini_base_url,
         headers=headers,
     ) as client:
-        response = client.post(path, json=payload)
-        response.raise_for_status()
-        data = response.json()
+        last_error: httpx.HTTPStatusError | None = None
+        for model in _gemini_model_candidates(settings.gemini_model, settings.gemini_fallback_models):
+            response = client.post(f"/models/{model}:generateContent", json=payload)
+            try:
+                response.raise_for_status()
+            except httpx.HTTPStatusError as error:
+                last_error = error
+                if response.status_code in {400, 401, 403}:
+                    raise
+                logger.warning("Gemini model %s failed, trying fallback model if available: %s", model, error)
+                continue
 
-    text = _extract_gemini_text(data)
-    if not text:
-        return None
+            data = response.json()
+            text = _extract_gemini_text(data)
+            if not text:
+                continue
 
-    parsed = _safe_json_loads(text)
-    if not isinstance(parsed, dict):
-        return None
-    return _normalize_analysis_draft(parsed, record, f"gemini:{settings.gemini_model}")
+            parsed = _safe_json_loads(text)
+            if not isinstance(parsed, dict):
+                continue
+            return _normalize_analysis_draft(parsed, record, f"gemini:{model}")
+
+    if last_error is not None:
+        raise last_error
+    return None
+
+
+def _gemini_model_candidates(primary_model: str, fallback_models: tuple[str, ...]) -> list[str]:
+    models: list[str] = []
+    for model in (primary_model, *fallback_models):
+        normalized = model.strip()
+        if normalized and normalized not in models:
+            models.append(normalized)
+    return models
 
 
 def _extract_gemini_text(payload: dict) -> str:

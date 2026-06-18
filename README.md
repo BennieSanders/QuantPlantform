@@ -112,7 +112,8 @@ export QUANT_PLATFORM_OPENAI_MODEL=gpt-5.5
 export QUANT_PLATFORM_OPENAI_BASE_URL=https://api.openai.com/v1
 export QUANT_PLATFORM_OPENAI_TIMEOUT_SECONDS=30
 export QUANT_PLATFORM_GEMINI_API_KEY=your-google-ai-studio-key
-export QUANT_PLATFORM_GEMINI_MODEL=gemini-3.5-flash
+export QUANT_PLATFORM_GEMINI_MODEL=gemini-2.5-flash
+export QUANT_PLATFORM_GEMINI_FALLBACK_MODELS=gemini-3.1-flash-lite,gemini-3.5-flash
 export QUANT_PLATFORM_GEMINI_BASE_URL=https://generativelanguage.googleapis.com/v1beta
 export QUANT_PLATFORM_GEMINI_TIMEOUT_SECONDS=30
 ```
