@@ -101,7 +101,12 @@ export QUANT_PLATFORM_AUTH_SECRET=change-me
 export QUANT_PLATFORM_ACCESS_TOKEN_TTL_SECONDS=86400
 export QUANT_PLATFORM_ALLOW_DEV_AUTH_FALLBACK=true
 export QUANT_PLATFORM_MARKET_DATA_BASE_URL=https://api.binance.com
-export QUANT_PLATFORM_MARKET_DATA_TIMEOUT_SECONDS=10
+export QUANT_PLATFORM_MARKET_DATA_FALLBACK_URLS=https://data-api.binance.vision
+export QUANT_PLATFORM_MARKET_DATA_TIMEOUT_SECONDS=20
+# 如果现场网络访问 Binance 超时，可在 backend/.env.local 配本机代理，例如：
+# export HTTP_PROXY=http://127.0.0.1:7898
+# export HTTPS_PROXY=http://127.0.0.1:7898
+# export ALL_PROXY=socks5://127.0.0.1:7898
 export QUANT_PLATFORM_OPENAI_API_KEY=sk-...
 export QUANT_PLATFORM_OPENAI_MODEL=gpt-5.5
 export QUANT_PLATFORM_OPENAI_BASE_URL=https://api.openai.com/v1

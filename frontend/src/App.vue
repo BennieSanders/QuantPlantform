@@ -609,8 +609,8 @@ async function refreshBacktests() {
   }
 }
 
-async function refreshMarketSeries() {
-  marketError.value = "";
+async function refreshMarketSeries({ preserveStatus = false } = {}) {
+  if (!preserveStatus) marketError.value = "";
   try {
     marketSeries.value = await getMarketKlines(
       marketSymbol.value,
@@ -622,15 +622,17 @@ async function refreshMarketSeries() {
     ensureCharts();
     renderCharts();
   } catch (error) {
-    marketError.value = error.message;
+    if (!preserveStatus) marketError.value = error.message;
   }
 }
 
-async function syncMarketData() {
+async function syncMarketData({ silent = false } = {}) {
   if (marketSyncing.value) return;
   marketSyncing.value = true;
-  marketMessage.value = "";
-  marketError.value = "";
+  if (!silent) {
+    marketMessage.value = "";
+    marketError.value = "";
+  }
   try {
     const syncResult = await syncMarketKlines({
       symbol: marketSymbol.value,
@@ -641,7 +643,13 @@ async function syncMarketData() {
     marketMessage.value = `同步完成：新增 ${syncResult.inserted}，更新 ${syncResult.updated}`;
     await refreshMarketSeries();
   } catch (error) {
-    marketError.value = error.message;
+    const fallbackMessage = `外部行情同步失败，已保留数据库缓存：${error.message}`;
+    if (marketSeries.value || silent) {
+      marketMessage.value = fallbackMessage;
+    } else {
+      marketError.value = fallbackMessage;
+    }
+    await refreshMarketSeries({ preserveStatus: true });
   } finally {
     marketSyncing.value = false;
   }
@@ -685,7 +693,7 @@ function toggleMarketAutoRefresh(enabled) {
   stopMarketPolling();
   if (enabled) {
     syncMarketData();
-    marketPollTimer = window.setInterval(syncMarketData, 10000);
+    marketPollTimer = window.setInterval(() => syncMarketData({ silent: true }), 10000);
   }
 }
 

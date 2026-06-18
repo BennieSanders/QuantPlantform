@@ -25,6 +25,19 @@ class MarketDataServiceTest(unittest.TestCase):
         start = _shanghai_day_start_utc(datetime(2026, 6, 11, 10, 30, tzinfo=UTC))
         self.assertEqual(start, datetime(2026, 6, 10, 16, 0, tzinfo=UTC))
 
+    def test_market_data_provider_urls_include_deduplicated_fallbacks(self) -> None:
+        from app.services.market_data_service import _market_data_provider_urls
+
+        urls = _market_data_provider_urls(
+            "https://api.binance.com/",
+            ("https://data-api.binance.vision", "https://api.binance.com"),
+        )
+
+        self.assertEqual(
+            urls,
+            ["https://api.binance.com", "https://data-api.binance.vision"],
+        )
+
     def test_sync_upserts_and_returns_ordered_series(self) -> None:
         with TemporaryDirectory() as tmp_dir:
             clear_app_modules()

@@ -23,6 +23,7 @@ class Settings:
     access_token_ttl_seconds: int
     allow_dev_auth_fallback: bool
     market_data_base_url: str
+    market_data_fallback_urls: tuple[str, ...]
     market_data_timeout_seconds: float
     openai_api_key: str | None
     openai_model: str
@@ -66,8 +67,15 @@ def get_settings() -> Settings:
         market_data_base_url=os.getenv(
             "QUANT_PLATFORM_MARKET_DATA_BASE_URL", "https://api.binance.com"
         ).rstrip("/"),
+        market_data_fallback_urls=tuple(
+            url.rstrip("/")
+            for url in _split_csv(
+                os.getenv("QUANT_PLATFORM_MARKET_DATA_FALLBACK_URLS"),
+                ("https://data-api.binance.vision",),
+            )
+        ),
         market_data_timeout_seconds=float(
-            os.getenv("QUANT_PLATFORM_MARKET_DATA_TIMEOUT_SECONDS", "10")
+            os.getenv("QUANT_PLATFORM_MARKET_DATA_TIMEOUT_SECONDS", "20")
         ),
         openai_api_key=os.getenv("QUANT_PLATFORM_OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY"),
         openai_model=os.getenv("QUANT_PLATFORM_OPENAI_MODEL", "gpt-5.5"),

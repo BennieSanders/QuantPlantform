@@ -135,6 +135,37 @@ def fetch_binance_klines(
     start_time: datetime | None = None,
 ) -> list[list]:
     settings = get_settings()
+    provider_urls = _market_data_provider_urls(
+        settings.market_data_base_url,
+        settings.market_data_fallback_urls,
+    )
+    provider_errors: list[str] = []
+
+    for base_url in provider_urls:
+        try:
+            return _fetch_binance_klines_from_url(
+                base_url=base_url,
+                symbol=symbol,
+                timeframe=timeframe,
+                limit=limit,
+                timeout=settings.market_data_timeout_seconds,
+                start_time=start_time,
+            )
+        except Exception as error:
+            provider_errors.append(f"{base_url}: {error}")
+
+    raise RuntimeError("; ".join(provider_errors) or "No market data provider configured")
+
+
+def _fetch_binance_klines_from_url(
+    *,
+    base_url: str,
+    symbol: str,
+    timeframe: str,
+    limit: int,
+    timeout: float,
+    start_time: datetime | None = None,
+) -> list[list]:
     remaining = min(max(limit, 1), 2000)
     next_start_ms = int(start_time.timestamp() * 1000) if start_time else None
     rows: list[list] = []
@@ -150,10 +181,10 @@ def fetch_binance_klines(
             params["startTime"] = next_start_ms
         query = urlencode(params)
         request = Request(
-            f"{settings.market_data_base_url}/api/v3/klines?{query}",
+            f"{base_url}/api/v3/klines?{query}",
             headers={"User-Agent": "quant-platform/0.1"},
         )
-        with urlopen(request, timeout=settings.market_data_timeout_seconds) as response:
+        with urlopen(request, timeout=timeout) as response:
             payload = json.loads(response.read().decode("utf-8"))
         if not isinstance(payload, list):
             raise ValueError("Market data provider returned an invalid response")
@@ -167,6 +198,15 @@ def fetch_binance_klines(
         next_start_ms = int(payload[-1][6]) + 1
 
     return rows
+
+
+def _market_data_provider_urls(primary_url: str, fallback_urls: tuple[str, ...]) -> list[str]:
+    urls: list[str] = []
+    for url in (primary_url, *fallback_urls):
+        normalized = url.rstrip("/")
+        if normalized and normalized not in urls:
+            urls.append(normalized)
+    return urls
 
 
 def _shanghai_day_start_utc(now: datetime | None = None) -> datetime:
