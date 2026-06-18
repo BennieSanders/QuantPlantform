@@ -2,13 +2,7 @@
 
 对应 PPT：`deliverables/quant_platform_defense_presentation_v3.pptx`
 
-用途说明：
 
-- `docs/project_report.md` 是项目报告，不是上台讲稿。
-- `docs/presentation_outline.md` 是提纲，适合快速背结构。
-- 本文件是正式讲稿，包含逐页讲解、演示串词和老师提问预案。
-
-建议总时长：8-10 分钟。PPT 讲解控制在 6-7 分钟，系统演示控制在 2-3 分钟。
 
 ## 一、开场
 
