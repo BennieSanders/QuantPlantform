@@ -50,7 +50,7 @@
 
 介绍 `BacktestEngine.run()` 的逐 Bar 执行顺序：先执行上一轮待成交订单，再把当前 K 线加入历史，再调用策略生成信号，最后按收盘价更新权益。撮合、风控和指标计算分别由 broker、risk、analyzer 模块负责。
 
-### 10. AI 智能推荐分析模块（50 秒）
+### 10. AI 智能分析模块（50 秒）
 
 说明 AI 模块输入的是结构化回测上下文，包括策略参数、收益、回撤、Sharpe、交易记录和权益曲线。Provider Router 支持 Gemini、OpenAI 和本地引擎。输出字段包括 score、confidence、warnings、recommendations、execution_plan 和 suggested_params。
 

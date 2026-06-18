@@ -41,7 +41,7 @@ Frontend crypto backtest form
 -> Frontend ECharts result
 ```
 
-当前工程化优先级：
+当前工程化阶段安排：
 
 - Config: 用 `QUANT_PLATFORM_*` 环境变量管理数据库、CORS、数据目录和默认系统用户。
 - Database: 本地开发仍可用 SQLite，正式 schema 通过 Alembic 维护。
@@ -84,8 +84,8 @@ Frontend crypto backtest form
 - `tests/` 已覆盖 MA/RSI 内置策略稳定结果、自定义策略校验、回测记录持久化服务和路由层用户隔离。
 - 已新增 `market_klines` 持久化模型和 `/api/market/sync`、`/api/market/klines` 接口，可从 Binance 拉取 BTC/ETH 的 1m、5m、15m、1h、1d K 线并增量更新。
 - 前端已新增实时行情观察页，支持手动同步和每 10 秒自动拉取、入库、刷新行情图；按周期自动使用合理窗口（1m/1天、5m/3天、15m/7天、1h/30天、1d/1年），并显示 MA7、MA25。
-- 回测服务会优先使用数据库中的近期行情，覆盖不足时再回退到样例 CSV；回测页面会同步并显示当前标的和周期的可用日期范围。
-- 已新增回测分析记录和 `/api/ai/backtests/{id}/analyze` 接口，输出风险等级、推荐评分、置信度、适配场景、风险提示、行动建议和建议参数，并保存分析历史。
+- 回测服务会首先使用数据库中的近期行情，覆盖不足时再回退到样例 CSV；回测页面会同步并显示当前标的和周期的可用日期范围。
+- 已新增回测分析记录和 `/api/ai/backtests/{id}/analyze` 接口，输出风险等级、综合评分、置信度、适配场景、风险提示、行动建议和建议参数，并保存分析历史。
 - AI 分析页支持 `Google Gemini` / `OpenAI` / `本地引擎` 切换；当前默认调用 Gemini API，如果没有配置密钥或调用失败，会回退到可离线复现的 `local-quant-recommender-v2`。
 
 ## 环境变量
@@ -230,7 +230,7 @@ python3 scripts/download_binance_klines.py --symbols BTCUSDT ETHUSDT --intervals
 PYTHONPATH="$(pwd):$(pwd)/backend" backend/.venv/bin/python -m unittest discover -s tests -v
 ```
 
-推荐的结项演示启动方式：
+结项演示启动方式：
 
 ```bash
 ./scripts/demo.sh
@@ -242,7 +242,7 @@ PYTHONPATH="$(pwd):$(pwd)/backend" backend/.venv/bin/python -m unittest discover
 ./scripts/check_demo.sh
 ```
 
-录屏前推荐使用后台一键重启方式：
+录屏前可使用后台一键重启方式：
 
 ```bash
 ./scripts/restart_demo.sh
