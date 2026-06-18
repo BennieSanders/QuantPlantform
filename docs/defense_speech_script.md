@@ -2,6 +2,8 @@
 
 对应 PPT：`deliverables/quant_platform_defense_presentation_v3.pptx`
 
+上台讲解优先看简化版：`docs/defense_speech_script_simple.md`。本文件保留完整技术版和问答预案，用于备查。
+
 
 
 ## 一、开场
