@@ -20,5 +20,6 @@ export PYTHONPATH="$ROOT_DIR:${PYTHONPATH:-}"
 export NO_PROXY="127.0.0.1,localhost,::1,${NO_PROXY:-}"
 export no_proxy="127.0.0.1,localhost,::1,${no_proxy:-}"
 export QUANT_PLATFORM_ALLOW_DEV_AUTH_FALLBACK="${QUANT_PLATFORM_ALLOW_DEV_AUTH_FALLBACK:-false}"
+export QUANT_PLATFORM_CORS_ORIGINS="${QUANT_PLATFORM_CORS_ORIGINS:-http://127.0.0.1:${FRONTEND_PORT:-5173},http://localhost:${FRONTEND_PORT:-5173}}"
 
-exec uvicorn app.main:app --host 127.0.0.1 --port 8000
+exec uvicorn app.main:app --host 127.0.0.1 --port "${BACKEND_PORT:-8000}"

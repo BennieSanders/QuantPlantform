@@ -90,7 +90,7 @@ Remaining engineering work:
 
 - Move timed market ingestion into a durable scheduler or worker.
 - Add gap, duplicate, and stale-data monitoring.
-- Add an external model provider with prompt versioning and evaluation cases.
+- Add external model provider evaluation cases and regression checks.
 - Rank parameter suggestions with out-of-sample candidate backtests.
 
 ## 2026-05-28

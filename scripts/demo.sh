@@ -8,7 +8,7 @@ cleanup() {
 }
 
 trap cleanup EXIT INT TERM
-"$ROOT_DIR/scripts/start_demo.sh"
+"$ROOT_DIR/scripts/start_demo.sh" --restart
 
 echo "Press Ctrl+C to stop the demo environment."
 while true; do

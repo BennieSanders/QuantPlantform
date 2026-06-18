@@ -3,8 +3,10 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 DATABASE="$ROOT_DIR/backend/quant_platform.db"
-BACKEND_URL="${BACKEND_URL:-http://127.0.0.1:8000}"
-FRONTEND_URL="${FRONTEND_URL:-http://127.0.0.1:5173}"
+BACKEND_PORT="${BACKEND_PORT:-8000}"
+FRONTEND_PORT="${FRONTEND_PORT:-5173}"
+BACKEND_URL="${BACKEND_URL:-http://127.0.0.1:$BACKEND_PORT}"
+FRONTEND_URL="${FRONTEND_URL:-http://127.0.0.1:$FRONTEND_PORT}"
 
 check_url() {
   local label="$1"

@@ -102,7 +102,7 @@ Remaining work:
 - Generate strategy-specific parameter suggestions. Done for MA and RSI.
 - Add frontend analysis generation and history views. Done.
 - Keep a provider field and stable response contract. Done.
-- Google Gemini and OpenAI provider integrations are implemented; prompt versioning and evaluation fixtures remain.
+- Google Gemini and OpenAI provider integrations are implemented; provider evaluation and regression fixtures remain.
 - Add parameter candidate backtests and rank suggestions using out-of-sample results.
 
 ## E6: Production Readiness

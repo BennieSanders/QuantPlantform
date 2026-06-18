@@ -6,6 +6,21 @@ RUN_DIR="$ROOT_DIR/.run"
 LOG_DIR="$RUN_DIR/logs"
 BACKEND_PID_FILE="$RUN_DIR/backend.pid"
 FRONTEND_PID_FILE="$RUN_DIR/frontend.pid"
+BACKEND_PORT="${BACKEND_PORT:-8000}"
+FRONTEND_PORT="${FRONTEND_PORT:-5173}"
+RESTART=false
+
+for arg in "$@"; do
+  case "$arg" in
+    --restart)
+      RESTART=true
+      ;;
+    *)
+      echo "Unknown argument: $arg" >&2
+      exit 2
+      ;;
+  esac
+done
 
 mkdir -p "$LOG_DIR"
 
@@ -18,8 +33,29 @@ require_free_port() {
   local pid
   pid="$(port_pid "$port")"
   if [ -n "$pid" ]; then
-    echo "Port $port is already in use by PID $pid. Run ./scripts/stop_demo.sh first." >&2
+    echo "Port $port is already in use by PID $pid. Run ./scripts/stop_demo.sh first, or use ./scripts/start_demo.sh --restart." >&2
     exit 1
+  fi
+}
+
+free_port_for_restart() {
+  local port="$1"
+  local pids
+  pids="$(lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null || true)"
+  if [ -z "$pids" ]; then
+    return
+  fi
+  echo "Stopping existing process on port $port: $pids"
+  kill $pids 2>/dev/null || true
+  for _ in {1..20}; do
+    if [ -z "$(lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null || true)" ]; then
+      return
+    fi
+    sleep 0.25
+  done
+  pids="$(lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null || true)"
+  if [ -n "$pids" ]; then
+    kill -9 $pids 2>/dev/null || true
   fi
 }
 
@@ -38,8 +74,14 @@ wait_for_url() {
   return 1
 }
 
-require_free_port 8000
-require_free_port 5173
+if [ "$RESTART" = true ]; then
+  "$ROOT_DIR/scripts/stop_demo.sh" --quiet || true
+  free_port_for_restart "$BACKEND_PORT"
+  free_port_for_restart "$FRONTEND_PORT"
+fi
+
+require_free_port "$BACKEND_PORT"
+require_free_port "$FRONTEND_PORT"
 
 if [ ! -d "$ROOT_DIR/backend/.venv" ]; then
   python3 -m venv "$ROOT_DIR/backend/.venv"
@@ -58,11 +100,11 @@ nohup "$ROOT_DIR/scripts/run_demo_frontend.sh" >"$LOG_DIR/frontend.log" 2>&1 </d
 echo "$!" >"$FRONTEND_PID_FILE"
 
 trap '"$ROOT_DIR/scripts/stop_demo.sh" --quiet' ERR
-wait_for_url "backend" "http://127.0.0.1:8000/health"
-wait_for_url "frontend" "http://127.0.0.1:5173"
+wait_for_url "backend" "http://127.0.0.1:$BACKEND_PORT/health"
+wait_for_url "frontend" "http://127.0.0.1:$FRONTEND_PORT"
 trap - ERR
 
 echo "Demo environment is running."
-echo "Frontend: http://127.0.0.1:5173"
-echo "Backend:  http://127.0.0.1:8000"
+echo "Frontend: http://127.0.0.1:$FRONTEND_PORT"
+echo "Backend:  http://127.0.0.1:$BACKEND_PORT"
 echo "Logs:     $LOG_DIR"

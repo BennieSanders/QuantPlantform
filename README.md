@@ -1,6 +1,6 @@
 # Quant Platform
 
-一个基于 Vue3 + FastAPI + Python 的工程化量化回测平台。当前重点是虚拟货币现货回测、AI 回测分析、实时行情采集与观察、策略管理、数据归属、迁移和测试底座。期货双向和美股不在当前范围内。
+一个基于 Vue3 + FastAPI + Python 的工程化量化回测平台。当前重点是虚拟货币现货回测、智能回测分析、实时行情采集与观察、策略管理、数据归属、迁移和测试底座。期货双向和美股不在当前范围内。
 
 ## 项目目标
 实现一个可长期演进的量化交易平台，支持：
@@ -11,7 +11,7 @@
 - 网页端策略代码编辑
 - 回测执行
 - 回测结果展示
-- AI 回测分析、风险判断和参数建议
+- 智能回测分析、风险判断和参数建议
 - 实时 K 线拉取、持久化和行情观察
 - 后续强化策略沙箱、独立任务队列和生产部署
 
@@ -85,7 +85,7 @@ Frontend crypto backtest form
 - 已新增 `market_klines` 持久化模型和 `/api/market/sync`、`/api/market/klines` 接口，可从 Binance 拉取 BTC/ETH 的 1m、5m、15m、1h、1d K 线并增量更新。
 - 前端已新增实时行情观察页，支持手动同步和每 10 秒自动拉取、入库、刷新行情图；按周期自动使用合理窗口（1m/1天、5m/3天、15m/7天、1h/30天、1d/1年），并显示 MA7、MA25。
 - 回测服务会优先使用数据库中的近期行情，覆盖不足时再回退到样例 CSV；回测页面会同步并显示当前标的和周期的可用日期范围。
-- 已新增 AI 回测分析记录和 `/api/ai/backtests/{id}/analyze` 接口，输出风险等级、推荐评分、置信度、适配场景、风险提示、行动建议和建议参数，并保存分析历史。
+- 已新增回测分析记录和 `/api/ai/backtests/{id}/analyze` 接口，输出风险等级、推荐评分、置信度、适配场景、风险提示、行动建议和建议参数，并保存分析历史。
 - AI 分析页支持 `Google Gemini` / `OpenAI` / `本地引擎` 切换；当前默认调用 Gemini API，如果没有配置密钥或调用失败，会回退到可离线复现的 `local-quant-recommender-v2`。
 
 ## 环境变量
@@ -231,22 +231,39 @@ PYTHONPATH="$(pwd):$(pwd)/backend" backend/.venv/bin/python -m unittest discover
 ./scripts/demo.sh
 ```
 
-该命令固定启动后端 `8000` 和前端 `5173`，保持终端运行，按 `Ctrl+C` 自动停止。另开终端可执行自检：
+该命令会先停止旧的演示进程，再启动后端 `8000` 和前端 `5173`，保持终端运行，按 `Ctrl+C` 自动停止。另开终端可执行自检：
 
 ```bash
 ./scripts/check_demo.sh
 ```
 
-后台启动和停止方式：
+录屏前推荐使用后台一键重启方式：
 
 ```bash
-./scripts/start_demo.sh
+./scripts/restart_demo.sh
+```
+
+该命令无论之前是否启动过，都会先释放 `8000/5173` 端口并重新启动，再执行自检。默认前端地址是：
+
+```text
+http://127.0.0.1:5173
+```
+
+如果确实需要使用 `5174`，可以显式指定：
+
+```bash
+FRONTEND_PORT=5174 ./scripts/restart_demo.sh
+```
+
+后台停止方式：
+
+```bash
 ./scripts/stop_demo.sh
 ```
 
 开发时仍可分别运行 `./scripts/dev_backend.sh` 和 `./scripts/dev_frontend.sh`。
 
-访问前端：
+默认访问前端：
 
 ```text
 http://127.0.0.1:5173
